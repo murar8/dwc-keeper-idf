@@ -1,10 +1,5 @@
 {
-  "idf.pythonInstallPath": "/home/lmurarotto/.espressif/python_env/idf5.4_py3.12_env/bin/python",
   "clangd.path": "/home/lmurarotto/.espressif/tools/esp-clang/esp-18.1.2_20240912/esp-clang/bin/clangd",
-  "cmake.environment": {
-    "IDF_PATH": "/home/lmurarotto/.esp-idf/v5.4.1/esp-idf"
-  },
-  "cmakeFormat.exePath": "/home/lmurarotto/.espressif/python_env/idf5.4_py3.12_env/bin/cmake-format",
   "clangd.arguments": [
     "--query-driver=/home/lmurarotto/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc",
     "--background-index"
