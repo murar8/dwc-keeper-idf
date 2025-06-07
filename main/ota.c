@@ -38,17 +38,7 @@ static bool is_same_sha256(esp_app_desc_t *new_app_info)
            memcmp(new_app_info->app_elf_sha256, running_app.app_elf_sha256, sizeof(new_app_info->app_elf_sha256)) == 0;
 }
 
-static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
-{
-    if (new_app_info == NULL)
-        return ESP_ERR_INVALID_ARG;
-    else if (is_same_sha256(new_app_info))
-        return ERR_ALREADY_UPDATED;
-    else
-        return ESP_OK;
-}
-
-static esp_err_t ota_update(void *pvParameter)
+static esp_err_t ota_update(void)
 {
     ESP_LOGI(TAG, "ota_update");
 
@@ -67,10 +57,15 @@ static esp_err_t ota_update(void *pvParameter)
         return err;
     }
 
-    err = validate_image_header(&app_desc);
+    if (is_same_sha256(&app_desc))
+    {
+        ESP_LOGI(TAG, "ota_update: Already up to date, skipping update.");
+        return ERR_ALREADY_UPDATED;
+    }
+
     if (err == ERR_ALREADY_UPDATED)
     {
-        ESP_LOGI(TAG, "ota_update: Current running version is the same as a new. We will not continue the update.");
+        ESP_LOGI(TAG, "ota_update: Already up to date, skipping update.");
         return err;
     }
     else if (err != ESP_OK)
@@ -79,11 +74,10 @@ static esp_err_t ota_update(void *pvParameter)
         return err;
     }
 
-    do
+    while (esp_https_ota_perform(ota_handle) == ESP_ERR_HTTPS_OTA_IN_PROGRESS)
     {
-        err = esp_https_ota_perform(ota_handle);
         ESP_LOGD(TAG, "ota_update: esp_https_ota_perform: %s", esp_err_to_name(err));
-    } while (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS);
+    }
 
     if (!esp_https_ota_is_complete_data_received(ota_handle))
     {
@@ -103,7 +97,7 @@ static esp_err_t ota_update(void *pvParameter)
 
 static void ota_task(void *pvParameter)
 {
-    esp_err_t err = ota_update(NULL);
+    esp_err_t err = ota_update();
     if (err != ESP_OK)
     {
         if (err != ERR_ALREADY_UPDATED)
