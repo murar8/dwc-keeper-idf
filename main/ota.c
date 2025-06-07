@@ -5,57 +5,29 @@
 
 #include "ota.h"
 
-#define ERR_ALREADY_UPDATED 0xC001C0DE
+#define ERR_ALREADY_UPDATED 0xC001C0DF
+
+#define OTA_URL "http://192.168.1.143:8080/dwc_keeper.bin"
+#define OTA_TIMEOUT_MS 10000
+
+#define OTA_TASK_STACK_SIZE_BYTES (1024 * 8)
+#define OTA_TASK_PRIORITY 5
 
 static const char *TAG = "ota";
 
 static esp_http_client_config_t ota_http_config = {
-    .url = "http://192.168.1.143:8080/dwc_keeper.bin",
-    .timeout_ms = 10000,
+    .url = OTA_URL,
+    .timeout_ms = OTA_TIMEOUT_MS,
     .keep_alive_enable = true,
     .skip_cert_common_name_check = true,
 };
+
 static esp_https_ota_config_t ota_config = {
     .http_config = &ota_http_config,
 };
 
-static void event_logger(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    if (event_base != ESP_HTTPS_OTA_EVENT)
-    {
-        return;
-    }
-    switch (event_id)
-    {
-    case ESP_HTTPS_OTA_START:
-        ESP_LOGI(TAG, "OTA started");
-        break;
-    case ESP_HTTPS_OTA_CONNECTED:
-        ESP_LOGI(TAG, "Connected to server");
-        break;
-    case ESP_HTTPS_OTA_GET_IMG_DESC:
-        ESP_LOGI(TAG, "Reading Image Description");
-        break;
-    case ESP_HTTPS_OTA_VERIFY_CHIP_ID:
-        ESP_LOGI(TAG, "Verifying chip id of new image: %d", *(esp_chip_id_t *)event_data);
-        break;
-    case ESP_HTTPS_OTA_DECRYPT_CB:
-        ESP_LOGI(TAG, "Callback to decrypt function");
-        break;
-    case ESP_HTTPS_OTA_WRITE_FLASH:
-        ESP_LOGD(TAG, "Writing to flash: %d written", *(int *)event_data);
-        break;
-    case ESP_HTTPS_OTA_UPDATE_BOOT_PARTITION:
-        ESP_LOGI(TAG, "Boot partition updated. Next Partition: %d", *(esp_partition_subtype_t *)event_data);
-        break;
-    case ESP_HTTPS_OTA_FINISH:
-        ESP_LOGI(TAG, "OTA finish");
-        break;
-    case ESP_HTTPS_OTA_ABORT:
-        ESP_LOGI(TAG, "OTA abort");
-        break;
-    }
-}
+static esp_https_ota_handle_t ota_handle = NULL;
+static TaskHandle_t ota_task_handle = NULL;
 
 static bool is_updated(esp_app_desc_t *new_app_info)
 {
@@ -74,88 +46,77 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
         return ESP_OK;
 }
 
+void ota_end()
+{
+    if (ota_handle != NULL)
+    {
+        esp_https_ota_abort(ota_handle);
+    }
+    if (ota_task_handle != NULL)
+    {
+        vTaskDelete(ota_task_handle);
+    }
+}
+
 void ota_task(void *pvParameter)
 {
-    ESP_LOGI(TAG, "OTA starting...");
+    ESP_LOGI(TAG, "ota_task");
 
-    esp_err_t ota_finish_err = ESP_OK;
-    esp_https_ota_handle_t ota_handle = NULL;
     esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
-        goto ota_end;
+        ESP_LOGE(TAG, "ota_task: esp_https_ota_begin failed: %s", esp_err_to_name(err));
+        ota_end();
+        return;
     }
 
     esp_app_desc_t app_desc;
     err = esp_https_ota_get_img_desc(ota_handle, &app_desc);
     if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "esp_https_ota_get_img_desc failed");
-        goto ota_end;
+        ESP_LOGE(TAG, "ota_task: esp_https_ota_get_img_desc failed: %s", esp_err_to_name(err));
+        ota_end();
+        return;
     }
+
     err = validate_image_header(&app_desc);
-    if (err != ESP_OK)
-    {
-        if (err != ERR_ALREADY_UPDATED)
-        {
-            ESP_LOGE(TAG, "image header verification failed");
-        }
-        goto ota_end;
-    }
-
-    while (1)
-    {
-        err = esp_https_ota_perform(ota_handle);
-        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS)
-        {
-            break;
-        }
-        // esp_https_ota_perform returns after every read operation which gives user the ability to
-        // monitor the status of OTA upgrade by calling esp_https_ota_get_image_len_read, which gives length of image
-        // data read so far.
-        ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(ota_handle));
-    }
-
-    if (esp_https_ota_is_complete_data_received(ota_handle) != true)
-    {
-        // the OTA image was not completely received and user can customise the response to this situation.
-        ESP_LOGE(TAG, "Complete data was not received.");
-    }
-    else
-    {
-        ota_finish_err = esp_https_ota_finish(ota_handle);
-        if ((err == ESP_OK) && (ota_finish_err == ESP_OK))
-        {
-            ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            esp_restart();
-        }
-        else
-        {
-            if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED)
-            {
-                ESP_LOGE(TAG, "Image validation failed, image is corrupted");
-            }
-            ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
-            vTaskDelete(NULL);
-        }
-    }
-
-ota_end:
     if (err == ERR_ALREADY_UPDATED)
     {
-        ESP_LOGI(TAG, "Current running version is the same as a new. We will not continue the update.");
+        ESP_LOGI(TAG, "ota_task: Current running version is the same as a new. We will not continue the update.");
+        ota_end();
+        return;
     }
-    else
+    else if (err != ESP_OK)
     {
-        ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed");
+        ESP_LOGE(TAG, "ota_task: validate_image_header failed: %s", esp_err_to_name(err));
+        ota_end();
+        return;
     }
-    if (ota_handle != NULL)
+
+    do
     {
-        esp_https_ota_abort(ota_handle);
+        err = esp_https_ota_perform(ota_handle);
+        ESP_LOGD(TAG, "ota_task: esp_https_ota_perform: %s", esp_err_to_name(err));
+    } while (err == ESP_ERR_HTTPS_OTA_IN_PROGRESS);
+
+    if (!esp_https_ota_is_complete_data_received(ota_handle))
+    {
+        ESP_LOGE(TAG, "ota_task: Complete data was not received.");
+        ota_end();
+        return;
     }
-    vTaskDelete(NULL);
+
+    err = esp_https_ota_finish(ota_handle);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "ota_task: esp_https_ota_finish failed: %s", esp_err_to_name(err));
+        ota_end();
+        return;
+    }
+
+    ESP_LOGI(TAG, "ota_task: ESP_HTTPS_OTA upgrade successful. Rebooting ...");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    esp_restart();
 }
 
 static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
@@ -163,15 +124,12 @@ static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t eve
     if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ESP_LOGI(TAG, "Connected to WiFi, starting OTA task");
-        xTaskCreate(&ota_task, TAG, 1024 * 8, NULL, 5, NULL);
-        vTaskDelete(NULL);
+        xTaskCreate(&ota_task, TAG, OTA_TASK_STACK_SIZE_BYTES, NULL, OTA_TASK_PRIORITY, &ota_task_handle);
     }
 }
 
 void ota_init(void)
 {
     ESP_LOGI(TAG, "OTA init");
-
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, NULL));
 }

@@ -13,8 +13,10 @@ void app_main(void)
 
     nvs_init();
     wifi_init();
+    ota_logger_init();
     ota_init();
     hd44780_t *lcd = lcd_init();
+
     hd44780_clear(lcd);
     hd44780_gotoxy(lcd, 0, 0);
     hd44780_puts(lcd, "Hello World!");
