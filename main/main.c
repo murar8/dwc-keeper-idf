@@ -13,7 +13,6 @@ void app_main(void)
 
     nvs_init();
     wifi_init();
-    ota_logger_init();
     ota_init();
     hd44780_t *lcd = lcd_init();
 

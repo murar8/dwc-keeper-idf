@@ -4,6 +4,7 @@
 #include <esp_ota_ops.h>
 
 #include "ota.h"
+#include "ota_logger.h"
 
 #define ERR_ALREADY_UPDATED 0xC001C0DF
 
@@ -46,7 +47,7 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info)
         return ESP_OK;
 }
 
-void ota_end()
+static void ota_end()
 {
     if (ota_handle != NULL)
     {
@@ -58,7 +59,7 @@ void ota_end()
     }
 }
 
-void ota_task(void *pvParameter)
+static void ota_task(void *pvParameter)
 {
     ESP_LOGI(TAG, "ota_task");
 
@@ -132,4 +133,5 @@ void ota_init(void)
 {
     ESP_LOGI(TAG, "OTA init");
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, NULL));
 }

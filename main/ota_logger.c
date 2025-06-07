@@ -1,11 +1,10 @@
 #include <esp_https_ota.h>
 #include <esp_log.h>
-#include <esp_netif_types.h>
 #include <esp_ota_ops.h>
 
 static const char *TAG = "ota_logger";
 
-static void event_logger(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+void event_logger(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     if (event_base != ESP_HTTPS_OTA_EVENT)
     {
@@ -41,10 +40,4 @@ static void event_logger(void *arg, esp_event_base_t event_base, int32_t event_i
         ESP_LOGI(TAG, "OTA abort");
         break;
     }
-}
-
-void ota_logger_init(void)
-{
-    ESP_LOGI(TAG, "ota_logger_init");
-    ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, NULL));
 }
