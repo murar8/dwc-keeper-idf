@@ -2,7 +2,7 @@
 #include <esp_log.h>
 #include <esp_ota_ops.h>
 
-static const char *TAG = "ota_logger";
+static const char *TAG = "ota_event";
 
 void event_logger(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {

@@ -27,10 +27,6 @@ static esp_https_ota_config_t ota_config = {
     .http_config = &ota_http_config,
 };
 
-static esp_https_ota_handle_t ota_handle = NULL;
-static TaskHandle_t ota_task_handle = NULL;
-static TaskHandle_t ota_logger_task_handle = NULL;
-
 static bool is_same_sha256(esp_app_desc_t *new_app_info)
 {
     esp_app_desc_t running_app;
@@ -38,7 +34,7 @@ static bool is_same_sha256(esp_app_desc_t *new_app_info)
            memcmp(new_app_info->app_elf_sha256, running_app.app_elf_sha256, sizeof(new_app_info->app_elf_sha256)) == 0;
 }
 
-static esp_err_t ota_update(void)
+static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
 {
     ESP_LOGI(TAG, "ota_update");
 
@@ -95,50 +91,36 @@ static esp_err_t ota_update(void)
     return ESP_OK;
 }
 
-static void ota_task(void *pvParameter)
+void ota_task(void *pvParameter)
 {
-    esp_err_t err = ota_update();
-    if (err != ESP_OK)
-    {
-        if (err != ERR_ALREADY_UPDATED)
-        {
-            ESP_LOGE(TAG, "ota_task: ota_update failed: %s", esp_err_to_name(err));
-        }
-        if (ota_handle != NULL)
-        {
-            esp_https_ota_abort(ota_handle);
-        }
-        if (ota_task_handle != NULL)
-        {
-            vTaskDelete(ota_task_handle);
-        }
-        if (ota_logger_task_handle != NULL)
-        {
-            vTaskDelete(ota_logger_task_handle);
-        }
-    }
-    else
+    esp_https_ota_handle_t ota_handle = NULL;
+    TaskHandle_t ota_logger_task_handle = NULL;
+
+    ESP_ERROR_CHECK(
+        esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, &ota_logger_task_handle));
+
+    esp_err_t err = ota_update(ota_handle);
+    if (err == ESP_OK)
     {
         ESP_LOGI(TAG, "ota_task: ESP_HTTPS_OTA upgrade successful. Rebooting ...");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         esp_restart();
     }
-}
-
-static void ip_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
+    else if (err != ERR_ALREADY_UPDATED)
     {
-        ESP_LOGI(TAG, "Connected to WiFi, starting OTA task");
-        xTaskCreate(&ota_task, TAG, OTA_TASK_STACK_SIZE_BYTES, NULL, OTA_TASK_PRIORITY, &ota_task_handle);
-        esp_event_handler_unregister(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler);
+        ESP_LOGE(TAG, "ota_task: ota_update failed: %s", esp_err_to_name(err));
     }
-}
 
-void ota_init(void)
-{
-    ESP_LOGI(TAG, "OTA init");
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL));
-    ESP_ERROR_CHECK(
-        esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, &ota_logger_task_handle));
+    if (ota_handle != NULL)
+    {
+        esp_https_ota_abort(ota_handle);
+    }
+    if (ota_logger_task_handle != NULL)
+    {
+        vTaskDelete(ota_logger_task_handle);
+    }
+    if (xTaskGetCurrentTaskHandle() != NULL)
+    {
+        vTaskDelete(NULL);
+    }
 }

@@ -1,3 +1,3 @@
 #pragma once
 
-void ota_init(void);
+void ota_task(void *pvParameter);
