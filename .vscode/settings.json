@@ -1,7 +1,5 @@
 {
-  "clangd.path": "/home/lmurarotto/.espressif/tools/esp-clang/esp-18.1.2_20240912/esp-clang/bin/clangd",
-  "clangd.arguments": [
-    "--query-driver=/home/lmurarotto/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc",
-    "--background-index"
-  ]
+  "cmake.environment": {
+    "IDF_PATH": "/home/lmurarotto/.esp-idf/v5.4.1/esp-idf"
+  }
 }
