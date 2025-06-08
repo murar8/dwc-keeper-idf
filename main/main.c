@@ -5,6 +5,7 @@
 
 #include "lcd.h"
 #include "ota.h"
+#include "server.h"
 #include "storage.h"
 #include "wifi.h"
 
@@ -23,7 +24,8 @@ void app_main(void)
 
     nvs_init();
     wifi_init();
-    esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL);
+    server_init();
+    // esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &ip_event_handler, NULL);
     hd44780_t *lcd = lcd_init();
 
     hd44780_clear(lcd);

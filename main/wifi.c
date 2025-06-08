@@ -1,4 +1,5 @@
 #include <esp_log.h>
+#include <esp_netif.h>
 #include <esp_smartconfig.h>
 #include <esp_wifi.h>
 #include <string.h>
@@ -20,6 +21,10 @@ static const char *TAG = "wifi";
 #define CONFIG_TASK_STACK_SIZE (1024 * 4)
 #define CONFIG_TASK_PRIORITY 3
 
+#define IP_ADDR "192.168.1.32"
+#define GW_ADDR "192.168.1.1"
+#define NETMASK_ADDR "255.255.255.0"
+
 static void smartconfig_task(void *parm)
 {
     EventBits_t uxBits;
@@ -35,7 +40,7 @@ static void smartconfig_task(void *parm)
         }
         if (uxBits & ESPTOUCH_DONE_BIT)
         {
-            ESP_LOGI(TAG, "smartconfig_task: over");
+            ESP_LOGI(TAG, "smartconfig_task: done");
             esp_smartconfig_stop();
             vTaskDelete(NULL);
         }
@@ -101,6 +106,14 @@ void wifi_init(void)
     s_wifi_event_group = xEventGroupCreate();
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
     assert(sta_netif);
+    ESP_ERROR_CHECK(esp_netif_dhcps_stop(sta_netif));
+    ESP_ERROR_CHECK(esp_netif_dhcpc_stop(sta_netif));
+
+    esp_netif_ip_info_t ip_info;
+    ip_info.ip.addr = esp_ip4addr_aton(IP_ADDR);
+    ip_info.gw.addr = esp_ip4addr_aton(GW_ADDR);
+    ip_info.netmask.addr = esp_ip4addr_aton(NETMASK_ADDR);
+    ESP_ERROR_CHECK(esp_netif_set_ip_info(sta_netif, &ip_info));
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));

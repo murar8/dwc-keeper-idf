@@ -1,22 +1,10 @@
 {
-  "cmake.environment": {
-    "IDF_PATH": "/home/lmurarotto/.esp-idf/v5.4.1/esp-idf"
-  },
-  "cmake.additionalCompilerSearchDirs": [
-    "/home/lmurarotto/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin"
-  ],
   "files.associations": {
     "*.proto": "proto3",
     ".env": "properties",
     ".env.*": "properties",
     ".helmignore": "ignore",
-    "gpio_types.h": "c",
-    "wifi.h": "c",
-    "sdkconfig.h": "c",
-    "lcd.h": "c",
-    "esp_https_ota.h": "c",
-    "nvs.h": "c",
-    "esp_wifi.h": "c",
-    "esp_wifi_types.h": "c"
+    "esp_netif_ip_addr.h": "c",
+    "esp_netif.h": "c"
   }
 }
