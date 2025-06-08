@@ -93,13 +93,12 @@ static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
 
 void ota_task(void *pvParameter)
 {
-    esp_https_ota_handle_t ota_handle = NULL;
-    TaskHandle_t ota_logger_task_handle = NULL;
-
+    TaskHandle_t ota_logger_task_handle;
     ESP_ERROR_CHECK(
         esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, &ota_logger_task_handle));
 
-    esp_err_t err = ota_update(ota_handle);
+    esp_https_ota_handle_t ota_handle;
+    esp_err_t err = ota_update(&ota_handle);
     if (err == ESP_OK)
     {
         ESP_LOGI(TAG, "ota_task: ESP_HTTPS_OTA upgrade successful. Rebooting ...");
