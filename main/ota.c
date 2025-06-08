@@ -36,7 +36,7 @@ static bool is_same_sha256(esp_app_desc_t *new_app_info)
 
 static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
 {
-    ESP_LOGI(TAG, "ota_update");
+    ESP_LOGI(TAG, "ota_update: starting...");
 
     esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
     if (err != ESP_OK)
@@ -59,12 +59,7 @@ static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
         return ERR_ALREADY_UPDATED;
     }
 
-    if (err == ERR_ALREADY_UPDATED)
-    {
-        ESP_LOGI(TAG, "ota_update: Already up to date, skipping update.");
-        return err;
-    }
-    else if (err != ESP_OK)
+    if (err != ESP_OK)
     {
         ESP_LOGE(TAG, "ota_update: validate_image_header failed: %s", esp_err_to_name(err));
         return err;
@@ -114,12 +109,12 @@ void ota_task(void *pvParameter)
     {
         esp_https_ota_abort(ota_handle);
     }
-    if (ota_logger_task_handle != NULL)
-    {
-        vTaskDelete(ota_logger_task_handle);
-    }
     if (xTaskGetCurrentTaskHandle() != NULL)
     {
         vTaskDelete(NULL);
+    }
+    if (ota_logger_task_handle != NULL)
+    {
+        vTaskDelete(ota_logger_task_handle);
     }
 }
