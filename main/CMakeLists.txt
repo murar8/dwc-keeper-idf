@@ -1,1 +1,14 @@
-idf_component_register(SRCS "server.c" "wifi.c" "main.c" "lcd.c" "ota.c" "ota_logger.c" "storage.c" INCLUDE_DIRS ".")
+idf_component_register(
+  SRCS
+  "server.c"
+  "wifi.c"
+  "main.c"
+  "lcd.c"
+  "ota.c"
+  "ota_logger.c"
+  "storage.c"
+  INCLUDE_DIRS
+  "."
+  EMBED_TXTFILES
+  "certs/cert.pem"
+  "certs/key.pem")

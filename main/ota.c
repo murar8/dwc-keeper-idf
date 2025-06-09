@@ -8,7 +8,6 @@
 
 #define ERR_ALREADY_UPDATED 0xC001C0D1
 
-#define OTA_URL "http://192.168.1.143:8080/dwc_keeper.bin"
 #define OTA_TIMEOUT_MS 10000
 
 #define OTA_TASK_STACK_SIZE_BYTES (1024 * 8)
@@ -17,7 +16,7 @@
 static const char *TAG = "ota";
 
 static esp_http_client_config_t ota_http_config = {
-    .url = OTA_URL,
+    .url = NULL,
     .timeout_ms = OTA_TIMEOUT_MS,
     .keep_alive_enable = true,
     .skip_cert_common_name_check = true,
@@ -86,12 +85,14 @@ static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
     return ESP_OK;
 }
 
-void ota_task(void *pvParameter)
+static void ota_task(void *pvParameter)
 {
     TaskHandle_t ota_logger_task_handle;
     ESP_ERROR_CHECK(
         esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, &ota_logger_task_handle));
 
+    ota_http_config.url = (char *)pvParameter;
+    assert(ota_http_config.url != NULL);
     esp_https_ota_handle_t ota_handle;
     esp_err_t err = ota_update(&ota_handle);
     if (err == ESP_OK)
@@ -117,4 +118,9 @@ void ota_task(void *pvParameter)
     {
         vTaskDelete(ota_logger_task_handle);
     }
+}
+
+void ota_run(const char *payload_url)
+{
+    xTaskCreate(ota_task, "ota_task", OTA_TASK_STACK_SIZE_BYTES, payload_url, OTA_TASK_PRIORITY, NULL);
 }

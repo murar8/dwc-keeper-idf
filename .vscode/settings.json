@@ -1,10 +1,6 @@
 {
+  "cmakeFormat.exePath": "/home/lmurarotto/.espressif/python_env/idf5.4_py3.12_env/bin/cmake-format",
   "files.associations": {
-    "*.proto": "proto3",
-    ".env": "properties",
-    ".env.*": "properties",
-    ".helmignore": "ignore",
-    "esp_netif_ip_addr.h": "c",
-    "esp_netif.h": "c"
+    "*.h": "c"
   }
 }
