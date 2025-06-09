@@ -8,16 +8,12 @@
 
 #define ERR_ALREADY_UPDATED 0xC001C0D1
 
-#define OTA_TIMEOUT_MS 10000
-
-#define OTA_TASK_STACK_SIZE_BYTES (1024 * 8)
-#define OTA_TASK_PRIORITY 5
 
 static const char *TAG = "ota";
 
 static esp_http_client_config_t ota_http_config = {
     .url = NULL,
-    .timeout_ms = OTA_TIMEOUT_MS,
+    .timeout_ms = CONFIG_OTA_TIMEOUT_MS,
     .keep_alive_enable = true,
     .skip_cert_common_name_check = true,
 };
@@ -122,5 +118,5 @@ static void ota_task(void *pvParameter)
 
 void ota_run(const char *payload_url)
 {
-    xTaskCreate(ota_task, "ota_task", OTA_TASK_STACK_SIZE_BYTES, payload_url, OTA_TASK_PRIORITY, NULL);
+    xTaskCreate(ota_task, "ota_task", CONFIG_OTA_TASK_STACK_SIZE, (void *)payload_url, CONFIG_OTA_TASK_PRIORITY, NULL);
 }

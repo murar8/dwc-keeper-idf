@@ -18,12 +18,6 @@ static const int ESPTOUCH_DONE_BIT = BIT1;
 
 static const char *TAG = "wifi";
 
-#define CONFIG_TASK_STACK_SIZE (1024 * 4)
-#define CONFIG_TASK_PRIORITY 3
-
-#define IP_ADDR "192.168.1.32"
-#define GW_ADDR "192.168.1.1"
-#define NETMASK_ADDR "255.255.255.0"
 
 static void smartconfig_task(void *parm)
 {
@@ -51,7 +45,7 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
-        xTaskCreate(smartconfig_task, "smartconfig_task", CONFIG_TASK_STACK_SIZE, NULL, CONFIG_TASK_PRIORITY, NULL);
+        xTaskCreate(smartconfig_task, "smartconfig_task", CONFIG_WIFI_TASK_STACK_SIZE, NULL, CONFIG_WIFI_TASK_PRIORITY, NULL);
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
@@ -110,10 +104,17 @@ void wifi_init(void)
     ESP_ERROR_CHECK(esp_netif_dhcpc_stop(sta_netif));
 
     esp_netif_ip_info_t ip_info;
-    ip_info.ip.addr = esp_ip4addr_aton(IP_ADDR);
-    ip_info.gw.addr = esp_ip4addr_aton(GW_ADDR);
-    ip_info.netmask.addr = esp_ip4addr_aton(NETMASK_ADDR);
+    ip_info.ip.addr = esp_ip4addr_aton(CONFIG_WIFI_STATIC_IP);
+    ip_info.gw.addr = esp_ip4addr_aton(CONFIG_WIFI_GATEWAY);
+    ip_info.netmask.addr = esp_ip4addr_aton(CONFIG_WIFI_NETMASK);
     ESP_ERROR_CHECK(esp_netif_set_ip_info(sta_netif, &ip_info));
+
+    // google dns
+    esp_netif_dns_info_t dns_info;
+    dns_info.ip.u_addr.ip4.addr = esp_ip4addr_aton(CONFIG_WIFI_DNS_MAIN);
+    ESP_ERROR_CHECK(esp_netif_set_dns_info(sta_netif, ESP_NETIF_DNS_MAIN, &dns_info));
+    dns_info.ip.u_addr.ip4.addr = esp_ip4addr_aton(CONFIG_WIFI_DNS_BACKUP);
+    ESP_ERROR_CHECK(esp_netif_set_dns_info(sta_netif, ESP_NETIF_DNS_BACKUP, &dns_info));
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));

@@ -1,0 +1,67 @@
+menu "DWC Keeper Configuration"
+
+    menu "WiFi Configuration"
+        config WIFI_TASK_STACK_SIZE
+            int "WiFi Task Stack Size"
+            default 4096
+            help
+                Stack size for WiFi related tasks in bytes.
+
+        config WIFI_TASK_PRIORITY
+            int "WiFi Task Priority"
+            default 3
+            help
+                Priority for WiFi related tasks.
+
+        config WIFI_STATIC_IP
+            string "Static IP Address"
+            default "192.168.1.32"
+            help
+                Static IP address for the device.
+
+        config WIFI_GATEWAY
+            string "Gateway Address"
+            default "192.168.1.1"
+            help
+                Gateway IP address for the network.
+
+        config WIFI_NETMASK
+            string "Netmask"
+            default "255.255.255.0"
+            help
+                Network mask for the static IP configuration.
+
+        config WIFI_DNS_MAIN
+            string "Primary DNS Server"
+            default "8.8.8.8"
+            help
+                Primary DNS server address.
+
+        config WIFI_DNS_BACKUP
+            string "Secondary DNS Server"
+            default "8.8.4.4"
+            help
+                Secondary DNS server address.
+    endmenu
+
+    menu "OTA Configuration"
+        config OTA_TIMEOUT_MS
+            int "OTA Timeout (ms)"
+            default 10000
+            help
+                Timeout for OTA operations in milliseconds.
+
+        config OTA_TASK_STACK_SIZE
+            int "OTA Task Stack Size"
+            default 8192
+            help
+                Stack size for OTA task in bytes.
+
+        config OTA_TASK_PRIORITY
+            int "OTA Task Priority"
+            default 5
+            help
+                Priority for OTA task.
+    endmenu
+
+endmenu
