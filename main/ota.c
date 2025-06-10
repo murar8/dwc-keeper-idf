@@ -8,14 +8,11 @@
 
 #define ERR_ALREADY_UPDATED 0xC001C0D1
 
-
 static const char *TAG = "ota";
 
 static esp_http_client_config_t ota_http_config = {
     .url = NULL,
     .timeout_ms = CONFIG_OTA_TIMEOUT_MS,
-    .keep_alive_enable = true,
-    .skip_cert_common_name_check = true,
 };
 
 static esp_https_ota_config_t ota_config = {

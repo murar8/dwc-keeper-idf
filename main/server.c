@@ -30,7 +30,12 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 
 static esp_err_t fallback_handler(httpd_req_t *req)
 {
-    return httpd_resp_send_404(req);
+    esp_err_t ret = httpd_resp_send_404(req);
+    if (ret == ESP_OK)
+        // return ESP_FAIL to close underlying socket
+        return ESP_FAIL;
+    else
+        return ret;
 }
 
 // call ota_task with the provided payload url
@@ -80,6 +85,11 @@ static httpd_handle_t start_webserver()
     extern const unsigned char key_end[] asm("_binary_key_pem_end");
     conf.prvtkey_pem = key_start;
     conf.prvtkey_len = key_end - key_start;
+
+    extern const unsigned char client_cert_start[] asm("_binary_client_crt_start");
+    extern const unsigned char client_cert_end[] asm("_binary_client_crt_end");
+    conf.cacert_pem = client_cert_start;
+    conf.cacert_len = client_cert_end - client_cert_start;
 
     esp_err_t ret = httpd_ssl_start(&server, &conf);
     if (ESP_OK != ret)

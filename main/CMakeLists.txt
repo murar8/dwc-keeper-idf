@@ -11,4 +11,5 @@ idf_component_register(
   "."
   EMBED_TXTFILES
   "certs/cert.pem"
-  "certs/key.pem")
+  "certs/key.pem"
+  "certs/client.crt")
