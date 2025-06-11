@@ -10,14 +10,33 @@
 
 static const char *TAG = "ota";
 
+extern const char client_cert_start[] asm("_binary_client_crt_start");
+
 static esp_http_client_config_t ota_http_config = {
     .url = NULL,
     .timeout_ms = CONFIG_OTA_TIMEOUT_MS,
+    .cert_pem = client_cert_start,
 };
 
 static esp_https_ota_config_t ota_config = {
     .http_config = &ota_http_config,
+    .bulk_flash_erase = true,
 };
+
+static esp_err_t get_current_sha256(char *sha256)
+{
+    esp_app_desc_t running_app;
+    if (esp_ota_get_partition_description(esp_ota_get_running_partition(), &running_app) == ESP_OK)
+    {
+        memcpy(sha256, running_app.app_elf_sha256, sizeof(running_app.app_elf_sha256));
+        return ESP_OK;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "get_current_sha256: esp_ota_get_partition_description failed");
+        return ESP_FAIL;
+    }
+}
 
 static bool is_same_sha256(esp_app_desc_t *new_app_info)
 {
@@ -111,6 +130,12 @@ static void ota_task(void *pvParameter)
     {
         vTaskDelete(ota_logger_task_handle);
     }
+}
+
+bool ota_is_image_up_to_date(const char sha256[32])
+{
+    char current_sha256[32];
+    return get_current_sha256(current_sha256) == ESP_OK && memcmp(current_sha256, sha256, 32) == ESP_OK;
 }
 
 void ota_run(const char *payload_url)

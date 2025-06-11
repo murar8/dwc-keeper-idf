@@ -14,6 +14,33 @@
 
 static const char *TAG = "server";
 
+static esp_err_t parse_sha256(const char *sha256, char *sha256_bytes, size_t sha256_len)
+{
+    if (sha256_len != 65)
+    {
+        ESP_LOGE(TAG, "parse_sha256: Invalid sha256 length: %d", sha256_len);
+        return ESP_FAIL;
+    }
+    if (sscanf(sha256,
+               "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
+               "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx",
+               &sha256_bytes[0], &sha256_bytes[1], &sha256_bytes[2], &sha256_bytes[3], &sha256_bytes[4],
+               &sha256_bytes[5], &sha256_bytes[6], &sha256_bytes[7], &sha256_bytes[8], &sha256_bytes[9],
+               &sha256_bytes[10], &sha256_bytes[11], &sha256_bytes[12], &sha256_bytes[13], &sha256_bytes[14],
+               &sha256_bytes[15], &sha256_bytes[16], &sha256_bytes[17], &sha256_bytes[18], &sha256_bytes[19],
+               &sha256_bytes[20], &sha256_bytes[21], &sha256_bytes[22], &sha256_bytes[23], &sha256_bytes[24],
+               &sha256_bytes[25], &sha256_bytes[26], &sha256_bytes[27], &sha256_bytes[28], &sha256_bytes[29],
+               &sha256_bytes[30], &sha256_bytes[31]) != 32)
+    {
+        ESP_LOGE(TAG, "parse_sha256: Invalid sha256");
+        return ESP_FAIL;
+    }
+    else
+    {
+        return ESP_OK;
+    }
+}
+
 static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     if (event_base == ESP_HTTPS_SERVER_EVENT)
@@ -41,6 +68,7 @@ static esp_err_t fallback_handler(httpd_req_t *req)
 // call ota_task with the provided payload url
 static esp_err_t ota_update_handler(httpd_req_t *req)
 {
+
     size_t payload_url_len = 0;
     payload_url_len = httpd_req_get_hdr_value_len(req, "payload_url") + 1;
     if (payload_url_len == 0)
@@ -66,6 +94,44 @@ static esp_err_t ota_update_handler(httpd_req_t *req)
     }
 }
 
+static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
+{
+    size_t sha256_len = 0;
+    sha256_len = httpd_req_get_hdr_value_len(req, "sha256") + 1;
+    if (sha256_len == 0)
+    {
+        ESP_LOGE(TAG, "ota_update_handler: No sha256 received");
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing sha256 header");
+    }
+    char *sha256 = calloc(1, sha256_len);
+    if (!sha256)
+    {
+        ESP_LOGE(TAG, "ota_update_handler: Not enough memory for sha256");
+        return ESP_ERR_NO_MEM;
+    }
+    if (httpd_req_get_hdr_value_str(req, "sha256", sha256, sha256_len) != ESP_OK)
+    {
+        ESP_LOGE(TAG, "check_image_up_to_date_handler: No sha256 received");
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing sha256 header");
+    }
+    char sha256_bytes[32];
+    if (parse_sha256(sha256, sha256_bytes, sha256_len) != ESP_OK)
+    {
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sha256 header");
+    }
+    if (ota_is_image_up_to_date(sha256_bytes))
+    {
+        ESP_LOGI(TAG, "check_image_up_to_date_handler: Image is up to date");
+        return httpd_resp_send(req, "Image is up to date", HTTPD_RESP_USE_STRLEN);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "check_image_up_to_date_handler: Image is not up to date");
+        httpd_resp_set_status(req, HTTPD_204);
+        return httpd_resp_send(req, "Image is not up to date", HTTPD_RESP_USE_STRLEN);
+    }
+}
+
 static httpd_handle_t start_webserver()
 {
     httpd_handle_t server = NULL;
@@ -75,6 +141,8 @@ static httpd_handle_t start_webserver()
 
     httpd_ssl_config_t conf = HTTPD_SSL_CONFIG_DEFAULT();
     conf.httpd.uri_match_fn = httpd_uri_match_wildcard;
+    conf.httpd.keep_alive_enable = true;
+    conf.httpd.keep_alive_idle = 10;
 
     extern const unsigned char cert_start[] asm("_binary_cert_pem_start");
     extern const unsigned char cert_end[] asm("_binary_cert_pem_end");
@@ -99,9 +167,12 @@ static httpd_handle_t start_webserver()
     }
 
     ESP_LOGI(TAG, "Registering URI handlers");
-    static const httpd_uri_t ota_uri = {.uri = "/ota", .method = HTTP_GET, .handler = ota_update_handler};
+    static const httpd_uri_t ota_uri = {.uri = "/ota", .method = HTTP_POST, .handler = ota_update_handler};
+    static const httpd_uri_t check_image_up_to_date_uri = {
+        .uri = "/ota/check", .method = HTTP_GET, .handler = check_image_up_to_date_handler};
     static const httpd_uri_t fallback_uri = {.uri = "/*", .method = HTTP_GET, .handler = fallback_handler};
     httpd_register_uri_handler(server, &ota_uri);
+    httpd_register_uri_handler(server, &check_image_up_to_date_uri);
     httpd_register_uri_handler(server, &fallback_uri);
     return server;
 }
