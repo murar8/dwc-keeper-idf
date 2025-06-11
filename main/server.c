@@ -127,8 +127,7 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     else
     {
         ESP_LOGI(TAG, "check_image_up_to_date_handler: Image is not up to date");
-        httpd_resp_set_status(req, HTTPD_204);
-        return httpd_resp_send(req, "Image is not up to date", HTTPD_RESP_USE_STRLEN);
+        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Image is not up to date");
     }
 }
 

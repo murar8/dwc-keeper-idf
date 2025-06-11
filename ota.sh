@@ -35,31 +35,22 @@ fi
 echo
 echo "Starting server..."
 python update-server.py "$local_ip" "$PORT" &
-sleep 1
+sleep 2
 server_pid=$!
 
 echo
 echo -n "Sending OTA request... "
 curl "${CURL_CERTS[@]}" -X POST https://${ESP_IP}/ota -H "payload_url: https://${local_ip}:${PORT}/dwc_keeper.bin"
 echo
+sleep 2
+echo
 
 echo
 payload_sha256=$(sha256sum build/dwc_keeper.elf | awk '{print $1}')
-while true; do
-    echo -n "Checking for image update... "
-    status_code=$(
-        curl -s "${CURL_CERTS[@]}" https://${ESP_IP}/ota/check -w "%{http_code}" -o /dev/null -H "sha256: $payload_sha256"
-    )
-    if [ "$status_code" -eq 200 ]; then
-        echo "Image updated!"
-        echo
-        echo "Update successful!"
-        exit 0
-    elif [ "$status_code" -eq 204 ]; then
-        echo "Image is not up to date"
-        sleep 3
-    else
-        echo "Error: $status_code"
-        exit 1
-    fi
-done
+echo "Checking for image update... "
+curl "${CURL_CERTS[@]}" https://${ESP_IP}/ota/check -H "sha256: $payload_sha256" --retry 10 --retry-delay 5 --retry-all-errors --fail
+echo
+
+echo
+echo "Update successful!"
+exit 0
