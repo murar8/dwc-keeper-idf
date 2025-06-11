@@ -5,8 +5,11 @@
 
 #include "ota.h"
 #include "ota_logger.h"
+#include "utils.h"
 
 #define ERR_ALREADY_UPDATED 0xC001C0D1
+
+#define SHA256_CHAR_LENGTH 32
 
 static const char *TAG = "ota";
 
@@ -23,99 +26,73 @@ static esp_https_ota_config_t ota_config = {
     .bulk_flash_erase = true,
 };
 
-static esp_err_t get_current_sha256(char *sha256)
+static esp_err_t get_current_sha256(char sha256[32])
 {
     esp_app_desc_t running_app;
-    if (esp_ota_get_partition_description(esp_ota_get_running_partition(), &running_app) == ESP_OK)
-    {
-        memcpy(sha256, running_app.app_elf_sha256, sizeof(running_app.app_elf_sha256));
-        return ESP_OK;
-    }
-    else
-    {
-        ESP_LOGE(TAG, "get_current_sha256: esp_ota_get_partition_description failed");
-        return ESP_FAIL;
-    }
-}
-
-static bool is_same_sha256(esp_app_desc_t *new_app_info)
-{
-    esp_app_desc_t running_app;
-    return esp_ota_get_partition_description(esp_ota_get_running_partition(), &running_app) == ESP_OK &&
-           memcmp(new_app_info->app_elf_sha256, running_app.app_elf_sha256, sizeof(new_app_info->app_elf_sha256)) == 0;
+    esp_err_t ret = esp_ota_get_partition_description(esp_ota_get_running_partition(), &running_app);
+    LOG_AND_RETURN_IF_ERR("get_current_sha256", "esp_ota_get_partition_description", ret);
+    memcpy(sha256, running_app.app_elf_sha256, sizeof(running_app.app_elf_sha256));
+    return ret;
 }
 
 static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
 {
-    ESP_LOGI(TAG, "ota_update: starting...");
-
-    esp_err_t err = esp_https_ota_begin(&ota_config, &ota_handle);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "ota_update: esp_https_ota_begin failed: %s", esp_err_to_name(err));
-        return err;
-    }
+    esp_err_t ret = esp_https_ota_begin(&ota_config, &ota_handle);
+    LOG_AND_RETURN_IF_ERR("ota_update", "esp_https_ota_begin", ret);
 
     esp_app_desc_t app_desc;
-    err = esp_https_ota_get_img_desc(ota_handle, &app_desc);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "ota_update: esp_https_ota_get_img_desc failed: %s", esp_err_to_name(err));
-        return err;
-    }
+    ret = esp_https_ota_get_img_desc(ota_handle, &app_desc);
+    LOG_AND_RETURN_IF_ERR("ota_update", "esp_https_ota_get_img_desc", ret);
 
-    if (is_same_sha256(&app_desc))
+    bool is_same;
+    ret = ota_is_image_up_to_date(app_desc.app_elf_sha256, &is_same);
+    LOG_AND_RETURN_IF_ERR("ota_update", "ota_is_image_up_to_date", ret);
+    if (is_same)
     {
-        ESP_LOGI(TAG, "ota_update: Already up to date, skipping update.");
         return ERR_ALREADY_UPDATED;
-    }
-
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "ota_update: validate_image_header failed: %s", esp_err_to_name(err));
-        return err;
     }
 
     while (esp_https_ota_perform(ota_handle) == ESP_ERR_HTTPS_OTA_IN_PROGRESS)
     {
-        ESP_LOGD(TAG, "ota_update: esp_https_ota_perform: %s", esp_err_to_name(err));
+        ESP_LOGD(TAG, "ota_update: esp_https_ota_perform: %s", esp_err_to_name(ret));
     }
 
     if (!esp_https_ota_is_complete_data_received(ota_handle))
     {
         ESP_LOGE(TAG, "ota_update: Complete data was not received.");
-        return err;
+        return ESP_FAIL;
     }
 
-    err = esp_https_ota_finish(ota_handle);
-    if (err != ESP_OK)
-    {
-        ESP_LOGE(TAG, "ota_update: esp_https_ota_finish failed: %s", esp_err_to_name(err));
-        return err;
-    }
+    ret = esp_https_ota_finish(ota_handle);
+    LOG_AND_RETURN_IF_ERR("ota_update", "esp_https_ota_finish", ret);
 
     return ESP_OK;
 }
 
-static void ota_task(void *pvParameter)
+static void ota_task(void *payload_url)
 {
     TaskHandle_t ota_logger_task_handle;
     ESP_ERROR_CHECK(
         esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, &ota_logger_task_handle));
 
-    ota_http_config.url = (char *)pvParameter;
-    assert(ota_http_config.url != NULL);
+    assert(payload_url != NULL);
+    ota_http_config.url = (char *)payload_url;
+    ESP_LOGI(TAG, "ota_task: Starting OTA update from %s", ota_http_config.url);
     esp_https_ota_handle_t ota_handle;
-    esp_err_t err = ota_update(&ota_handle);
-    if (err == ESP_OK)
+    esp_err_t ret = ota_update(&ota_handle);
+    if (ret == ESP_OK)
     {
         ESP_LOGI(TAG, "ota_task: ESP_HTTPS_OTA upgrade successful. Rebooting ...");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         esp_restart();
     }
-    else if (err != ERR_ALREADY_UPDATED)
+    else if (ret == ERR_ALREADY_UPDATED)
     {
-        ESP_LOGE(TAG, "ota_task: ota_update failed: %s", esp_err_to_name(err));
+        ESP_LOGI(TAG, "ota_update: Already up to date, skipping update.");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "ota_task: ota_update failed: %s", esp_err_to_name(ret));
     }
 
     if (ota_handle != NULL)
@@ -130,12 +107,19 @@ static void ota_task(void *pvParameter)
     {
         vTaskDelete(ota_logger_task_handle);
     }
+    if (payload_url != NULL)
+    {
+        free(payload_url);
+    }
 }
 
-bool ota_is_image_up_to_date(const char sha256[32])
+esp_err_t ota_is_image_up_to_date(uint8_t sha256[32], bool *is_up_to_date)
 {
-    char current_sha256[32];
-    return get_current_sha256(current_sha256) == ESP_OK && memcmp(current_sha256, sha256, 32) == ESP_OK;
+    char current_sha256[SHA256_CHAR_LENGTH];
+    esp_err_t ret = get_current_sha256(current_sha256);
+    LOG_AND_RETURN_IF_ERR("ota_is_image_up_to_date", "get_current_sha256", ret);
+    *is_up_to_date = memcmp(sha256, current_sha256, SHA256_CHAR_LENGTH) == 0;
+    return ESP_OK;
 }
 
 void ota_run(const char *payload_url)

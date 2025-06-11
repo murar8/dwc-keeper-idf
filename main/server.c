@@ -11,10 +11,11 @@
 #include <sys/param.h>
 
 #include "ota.h"
+#include "utils.h"
 
 static const char *TAG = "server";
 
-static esp_err_t parse_sha256(const char *sha256, char *sha256_bytes, size_t sha256_len)
+static esp_err_t parse_sha256(const char *sha256, size_t sha256_len, uint8_t *sha256_bytes)
 {
     if (sha256_len != 65)
     {
@@ -58,17 +59,13 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 static esp_err_t fallback_handler(httpd_req_t *req)
 {
     esp_err_t ret = httpd_resp_send_404(req);
-    if (ret == ESP_OK)
-        // return ESP_FAIL to close underlying socket
-        return ESP_FAIL;
-    else
-        return ret;
+    LOG_AND_RETURN_IF_ERR("fallback_handler", "httpd_resp_send_404", ret);
+    return ESP_FAIL; // return ESP_FAIL to close underlying socket
 }
 
 // call ota_task with the provided payload url
 static esp_err_t ota_update_handler(httpd_req_t *req)
 {
-
     size_t payload_url_len = 0;
     payload_url_len = httpd_req_get_hdr_value_len(req, "payload_url") + 1;
     if (payload_url_len == 0)
@@ -82,16 +79,12 @@ static esp_err_t ota_update_handler(httpd_req_t *req)
         ESP_LOGE(TAG, "ota_update_handler: Not enough memory for payload url");
         return ESP_ERR_NO_MEM;
     }
-    if (httpd_req_get_hdr_value_str(req, "payload_url", payload_url, payload_url_len) != ESP_OK)
-    {
-        ESP_LOGE(TAG, "ota_update_handler: No payload url received");
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing payload_url header");
-    }
-    {
-        ESP_LOGI(TAG, "ota_update_handler: payload_url: %s", payload_url);
-        ota_run(payload_url);
-        return httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
-    }
+    esp_err_t ret = httpd_req_get_hdr_value_str(req, "payload_url", payload_url, payload_url_len);
+    LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_req_get_hdr_value_str", ret, free(payload_url));
+    ota_run(payload_url); // ota_run will free payload_url
+    ret = httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
+    LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_resp_send", ret);
+    return ret;
 }
 
 static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
@@ -109,17 +102,25 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
         ESP_LOGE(TAG, "ota_update_handler: Not enough memory for sha256");
         return ESP_ERR_NO_MEM;
     }
-    if (httpd_req_get_hdr_value_str(req, "sha256", sha256, sha256_len) != ESP_OK)
+    esp_err_t ret = httpd_req_get_hdr_value_str(req, "sha256", sha256, sha256_len);
+    LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "httpd_req_get_hdr_value_str", ret, free(sha256));
+    uint8_t sha256_bytes[32];
+    ret = parse_sha256(sha256, sha256_len, sha256_bytes);
+    free(sha256);
+    if (ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "check_image_up_to_date_handler: No sha256 received");
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing sha256 header");
+        esp_err_t ret = httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sha256 header");
+        LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "httpd_resp_send_err", ret);
+        return ret;
     }
-    char sha256_bytes[32];
-    if (parse_sha256(sha256, sha256_bytes, sha256_len) != ESP_OK)
+    bool is_up_to_date;
+    ret = ota_is_image_up_to_date(sha256_bytes, &is_up_to_date);
+    if (ret != ESP_OK)
     {
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sha256 header");
+        LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "ota_is_image_up_to_date", ret);
+        return ret;
     }
-    if (ota_is_image_up_to_date(sha256_bytes))
+    if (is_up_to_date)
     {
         ESP_LOGI(TAG, "check_image_up_to_date_handler: Image is up to date");
         return httpd_resp_send(req, "Image is up to date", HTTPD_RESP_USE_STRLEN);

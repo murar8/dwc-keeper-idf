@@ -2,5 +2,4 @@
 
 void ota_run(const char *payload_url);
 
-//
-bool ota_is_image_up_to_date(const char sha256[32]);
+esp_err_t ota_is_image_up_to_date(uint8_t sha256[32], bool *is_up_to_date);
