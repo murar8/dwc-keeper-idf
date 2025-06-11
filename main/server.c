@@ -9,6 +9,7 @@
 #include <esp_wifi.h>
 #include <nvs_flash.h>
 #include <sys/param.h>
+#include <sys/time.h>
 
 #include "ota.h"
 #include "utils.h"
@@ -132,6 +133,33 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     }
 }
 
+static esp_err_t logs_handler(httpd_req_t *req)
+{
+    httpd_resp_set_type(req, "text/event-stream");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    httpd_resp_set_hdr(req, "Connection", "keep-alive");
+
+    char sse_data[64];
+    while (1)
+    {
+        struct timeval tv;
+        gettimeofday(&tv, NULL);             // Get the current time
+        int64_t time_since_boot = tv.tv_sec; // Time since boot in seconds
+        esp_err_t err;
+        int len =
+            snprintf(sse_data, sizeof(sse_data), "data: Time since boot: %" PRIi64 " seconds\n\n", time_since_boot);
+        if ((err = httpd_resp_send_chunk(req, sse_data, len)) != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Failed to send sse data (returned %02X)", err);
+            break;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Send data every second
+    }
+
+    httpd_resp_send_chunk(req, NULL, 0); // End response
+    return ESP_OK;
+}
+
 static httpd_handle_t start_webserver()
 {
     httpd_handle_t server = NULL;
@@ -144,20 +172,20 @@ static httpd_handle_t start_webserver()
     conf.httpd.keep_alive_enable = true;
     conf.httpd.keep_alive_idle = 10;
 
-    extern const unsigned char cert_start[] asm("_binary_cert_pem_start");
-    extern const unsigned char cert_end[] asm("_binary_cert_pem_end");
+    extern const unsigned char cert_start[] asm("_binary_server_pem_start");
+    extern const unsigned char cert_end[] asm("_binary_server_pem_end");
     conf.servercert = cert_start;
     conf.servercert_len = cert_end - cert_start;
 
-    extern const unsigned char key_start[] asm("_binary_key_pem_start");
-    extern const unsigned char key_end[] asm("_binary_key_pem_end");
+    extern const unsigned char key_start[] asm("_binary_server_key_start");
+    extern const unsigned char key_end[] asm("_binary_server_key_end");
     conf.prvtkey_pem = key_start;
     conf.prvtkey_len = key_end - key_start;
 
-    extern const unsigned char client_cert_start[] asm("_binary_client_crt_start");
-    extern const unsigned char client_cert_end[] asm("_binary_client_crt_end");
-    conf.cacert_pem = client_cert_start;
-    conf.cacert_len = client_cert_end - client_cert_start;
+    extern const unsigned char ca_cert_start[] asm("_binary_ca_pem_start");
+    extern const unsigned char ca_cert_end[] asm("_binary_ca_pem_end");
+    conf.cacert_pem = ca_cert_start;
+    conf.cacert_len = ca_cert_end - ca_cert_start;
 
     esp_err_t ret = httpd_ssl_start(&server, &conf);
     if (ESP_OK != ret)
@@ -170,9 +198,11 @@ static httpd_handle_t start_webserver()
     static const httpd_uri_t ota_uri = {.uri = "/ota", .method = HTTP_POST, .handler = ota_update_handler};
     static const httpd_uri_t check_image_up_to_date_uri = {
         .uri = "/ota/check", .method = HTTP_GET, .handler = check_image_up_to_date_handler};
+    static const httpd_uri_t sse = {.uri = "/logs", .method = HTTP_GET, .handler = logs_handler};
     static const httpd_uri_t fallback_uri = {.uri = "/*", .method = HTTP_GET, .handler = fallback_handler};
     httpd_register_uri_handler(server, &ota_uri);
     httpd_register_uri_handler(server, &check_image_up_to_date_uri);
+    httpd_register_uri_handler(server, &sse);
     httpd_register_uri_handler(server, &fallback_uri);
     return server;
 }

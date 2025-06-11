@@ -2,6 +2,8 @@
 *.key
 *.csr
 *.crt
+*.p12
+*.srl
 
 .envrc
 sdkconfig.old

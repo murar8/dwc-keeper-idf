@@ -13,12 +13,12 @@
 
 static const char *TAG = "ota";
 
-extern const char client_cert_start[] asm("_binary_client_crt_start");
+extern const char ca_cert_start[] asm("_binary_ca_pem_start");
 
 static esp_http_client_config_t ota_http_config = {
     .url = NULL,
     .timeout_ms = CONFIG_OTA_TIMEOUT_MS,
-    .cert_pem = client_cert_start,
+    .cert_pem = ca_cert_start,
 };
 
 static esp_https_ota_config_t ota_config = {

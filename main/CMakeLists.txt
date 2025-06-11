@@ -10,6 +10,7 @@ idf_component_register(
   INCLUDE_DIRS
   "."
   EMBED_TXTFILES
-  "certs/cert.pem"
-  "certs/key.pem"
-  "certs/client.crt")
+  "certs/client.pem"
+  "certs/server.pem"
+  "certs/server.key"
+  "certs/ca.pem")

@@ -16,7 +16,7 @@ if __name__ == "__main__":
 
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(
-        certfile="main/certs/client.crt", keyfile="main/certs/client.key"
+        certfile="main/certs/client.pem", keyfile="main/certs/client.key"
     )
 
     httpd = http.server.ThreadingHTTPServer((host, port), BuildFilesHandler)

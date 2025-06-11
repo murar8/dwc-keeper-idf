@@ -5,6 +5,7 @@ set -u          # exit on unset variable
 set -o pipefail # exit on pipe error
 
 function kill_server() {
+    # shellcheck disable=SC2317
     if [ -n "${server_pid:-}" ] && [ "$(ps -p "$server_pid" | wc -l)" -eq 2 ]; then
         echo
         echo "Stopping server..."
@@ -15,7 +16,7 @@ function kill_server() {
 trap kill_server EXIT
 
 PORT=8080
-CURL_CERTS=("--cacert" "main/certs/cert.pem" "--cert" "main/certs/client.crt" "--key" "main/certs/client.key")
+CURL_CERTS=("-k" "--cert" "main/certs/client.pem" "--key" "main/certs/client.key")
 ESP_IP=192.168.1.32
 local_ip=$(ip -4 addr show wlp3s0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 
