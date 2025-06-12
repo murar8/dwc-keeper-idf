@@ -69,12 +69,17 @@ static esp_err_t ota_update_handler(httpd_req_t *req)
 {
     if (is_ota_running())
     {
-        return httpd_resp_send_custom_err(req, "503", "OTA update is already running");
+        esp_err_t ret = httpd_resp_send_custom_err(req, "503", "OTA update is already running");
+        LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_resp_send_custom_err", ret);
+        return ESP_FAIL; // return ESP_FAIL to close underlying socket
     }
-    ota_run();
-    esp_err_t ret = httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
-    LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_resp_send", ret);
-    return ESP_OK;
+    else
+    {
+        ota_run();
+        esp_err_t ret = httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
+        LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_resp_send", ret);
+        return ESP_OK;
+    }
 }
 
 static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
@@ -83,6 +88,7 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     {
         return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "OTA update is already running");
     }
+
     size_t sha256_len = 0;
     sha256_len = httpd_req_get_hdr_value_len(req, "sha256") + 1;
     if (sha256_len == 0)
@@ -90,12 +96,14 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
         ESP_LOGE(TAG, "ota_update_handler: No sha256 received");
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing sha256 header");
     }
+
     char *sha256 = calloc(1, sha256_len);
     if (!sha256)
     {
         ESP_LOGE(TAG, "ota_update_handler: Not enough memory for sha256");
         return ESP_ERR_NO_MEM;
     }
+
     esp_err_t ret = httpd_req_get_hdr_value_str(req, "sha256", sha256, sha256_len);
     LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "httpd_req_get_hdr_value_str", ret, free(sha256));
     uint8_t sha256_bytes[32];
@@ -107,6 +115,7 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
         LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "httpd_resp_send_err", ret);
         return ret;
     }
+
     bool is_up_to_date;
     ret = ota_is_image_up_to_date(sha256_bytes, &is_up_to_date);
     if (ret != ESP_OK)
@@ -114,6 +123,7 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
         LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "ota_is_image_up_to_date", ret);
         return ret;
     }
+
     if (is_up_to_date)
     {
         ESP_LOGI(TAG, "check_image_up_to_date_handler: Image is up to date");

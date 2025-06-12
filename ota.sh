@@ -49,9 +49,9 @@ echo
 echo
 payload_sha256=$(sha256sum build/dwc_keeper.elf | awk '{print $1}')
 echo "Checking for image update... "
-curl "${CURL_CERTS[@]}" https://${ESP_IP}/ota/check -H "sha256: $payload_sha256" --retry 10 --retry-delay 5 --retry-all-errors --fail
+curl "${CURL_CERTS[@]}" https://${ESP_IP}/ota/check -H "sha256: $payload_sha256" --retry 10 --retry-delay 5 --retry-all-errors --fail --max-time 5
 echo
 
 echo
-echo "Update successful!"
-exit 0
+echo "Update successful! Tailing logs..."
+curl -N "${CURL_CERTS[@]}" https://${ESP_IP}/logs
