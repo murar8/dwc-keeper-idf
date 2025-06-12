@@ -127,6 +127,14 @@ bool is_ota_running(void)
 
 void ota_run(void)
 {
-    s_ota_running = true;
-    xTaskCreate(ota_task, "ota_task", CONFIG_OTA_TASK_STACK_SIZE, NULL, CONFIG_OTA_TASK_PRIORITY, NULL);
+    if (s_ota_running)
+    {
+        ESP_LOGE(TAG, "ota_run: OTA is already running");
+        return;
+    }
+    else
+    {
+        s_ota_running = true;
+        xTaskCreate(ota_task, "ota_task", CONFIG_OTA_TASK_STACK_SIZE, NULL, CONFIG_OTA_TASK_PRIORITY, NULL);
+    }
 }
