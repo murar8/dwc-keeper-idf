@@ -62,6 +62,12 @@ menu "DWC Keeper Configuration"
             default 5
             help
                 Priority for OTA task.
+        
+        config OTA_PAYLOAD_URL
+            string "OTA Payload URL"
+            default "https://192.168.1.150:8080/dwc_keeper.bin"
+            help
+                URL to the OTA payload.
     endmenu
 
 endmenu

@@ -26,6 +26,8 @@ static esp_https_ota_config_t ota_config = {
     .bulk_flash_erase = true,
 };
 
+static bool s_ota_running = false;
+
 static esp_err_t get_current_sha256(char sha256[32])
 {
     esp_app_desc_t running_app;
@@ -69,14 +71,13 @@ static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
     return ESP_OK;
 }
 
-static void ota_task(void *payload_url)
+static void ota_task(void *pvParameters)
 {
     TaskHandle_t ota_logger_task_handle;
     ESP_ERROR_CHECK(
         esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, &ota_logger_task_handle));
 
-    assert(payload_url != NULL);
-    ota_http_config.url = (char *)payload_url;
+    ota_http_config.url = CONFIG_OTA_PAYLOAD_URL;
     ESP_LOGI(TAG, "ota_task: Starting OTA update from %s", ota_http_config.url);
     esp_https_ota_handle_t ota_handle;
     esp_err_t ret = ota_update(&ota_handle);
@@ -95,6 +96,7 @@ static void ota_task(void *payload_url)
         ESP_LOGE(TAG, "ota_task: ota_update failed: %s", esp_err_to_name(ret));
     }
 
+    s_ota_running = false;
     if (ota_handle != NULL)
     {
         esp_https_ota_abort(ota_handle);
@@ -107,10 +109,6 @@ static void ota_task(void *payload_url)
     {
         vTaskDelete(ota_logger_task_handle);
     }
-    if (payload_url != NULL)
-    {
-        free(payload_url);
-    }
 }
 
 esp_err_t ota_is_image_up_to_date(uint8_t sha256[32], bool *is_up_to_date)
@@ -122,7 +120,13 @@ esp_err_t ota_is_image_up_to_date(uint8_t sha256[32], bool *is_up_to_date)
     return ESP_OK;
 }
 
-void ota_run(const char *payload_url)
+bool is_ota_running(void)
 {
-    xTaskCreate(ota_task, "ota_task", CONFIG_OTA_TASK_STACK_SIZE, (void *)payload_url, CONFIG_OTA_TASK_PRIORITY, NULL);
+    return s_ota_running;
+}
+
+void ota_run(void)
+{
+    s_ota_running = true;
+    xTaskCreate(ota_task, "ota_task", CONFIG_OTA_TASK_STACK_SIZE, NULL, CONFIG_OTA_TASK_PRIORITY, NULL);
 }

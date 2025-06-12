@@ -16,7 +16,7 @@ function kill_server() {
 trap kill_server EXIT
 
 PORT=8080
-CURL_CERTS=("-k" "--cert" "main/certs/client.pem" "--key" "main/certs/client.key")
+CURL_CERTS=("--cert" "main/certs/client.pem" "--key" "main/certs/client.key")
 ESP_IP=192.168.1.32
 local_ip=$(ip -4 addr show wlp3s0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 
@@ -41,7 +41,7 @@ server_pid=$!
 
 echo
 echo -n "Sending OTA request... "
-curl "${CURL_CERTS[@]}" -X POST https://${ESP_IP}/ota -H "payload_url: https://${local_ip}:${PORT}/dwc_keeper.bin"
+curl "${CURL_CERTS[@]}" -X POST --fail https://${ESP_IP}/ota
 echo
 sleep 2
 echo

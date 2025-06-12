@@ -1,3 +1,8 @@
+#pragma once
+
+#include <esp_err.h>
+#include <esp_log.h>
+
 #define LOG_AND_RETURN_IF_ERR(name, method_name, value, ...)                                                           \
     if (value != ESP_OK)                                                                                               \
     {                                                                                                                  \

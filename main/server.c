@@ -67,29 +67,22 @@ static esp_err_t fallback_handler(httpd_req_t *req)
 // call ota_task with the provided payload url
 static esp_err_t ota_update_handler(httpd_req_t *req)
 {
-    size_t payload_url_len = 0;
-    payload_url_len = httpd_req_get_hdr_value_len(req, "payload_url") + 1;
-    if (payload_url_len == 0)
+    if (is_ota_running())
     {
-        ESP_LOGE(TAG, "ota_update_handler: No payload url received");
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing payload_url header");
+        return httpd_resp_send_custom_err(req, "503", "OTA update is already running");
     }
-    char *payload_url = calloc(1, payload_url_len);
-    if (!payload_url)
-    {
-        ESP_LOGE(TAG, "ota_update_handler: Not enough memory for payload url");
-        return ESP_ERR_NO_MEM;
-    }
-    esp_err_t ret = httpd_req_get_hdr_value_str(req, "payload_url", payload_url, payload_url_len);
-    LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_req_get_hdr_value_str", ret, free(payload_url));
-    ota_run(payload_url); // ota_run will free payload_url
-    ret = httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
+    ota_run();
+    esp_err_t ret = httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
     LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_resp_send", ret);
-    return ret;
+    return ESP_OK;
 }
 
 static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
 {
+    if (is_ota_running())
+    {
+        return httpd_resp_send_err(req, HTTPD_403_FORBIDDEN, "OTA update is already running");
+    }
     size_t sha256_len = 0;
     sha256_len = httpd_req_get_hdr_value_len(req, "sha256") + 1;
     if (sha256_len == 0)
@@ -169,8 +162,8 @@ static httpd_handle_t start_webserver()
 
     httpd_ssl_config_t conf = HTTPD_SSL_CONFIG_DEFAULT();
     conf.httpd.uri_match_fn = httpd_uri_match_wildcard;
-    conf.httpd.keep_alive_enable = true;
-    conf.httpd.keep_alive_idle = 10;
+
+    conf.httpd.max_open_sockets = 7; // maxiumum allowed is 7
 
     extern const unsigned char cert_start[] asm("_binary_server_pem_start");
     extern const unsigned char cert_end[] asm("_binary_server_pem_end");
