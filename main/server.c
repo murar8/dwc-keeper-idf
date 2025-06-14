@@ -6,9 +6,10 @@
 #include <nvs_flash.h>
 #include <sys/param.h>
 #include <sys/time.h>
+#include <sys/types.h>
 
+#include "logger.h"
 #include "ota.h"
-#include "utils.h"
 
 static const char *TAG = "server";
 
@@ -56,7 +57,8 @@ static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_
 static esp_err_t fallback_handler(httpd_req_t *req)
 {
     esp_err_t ret = httpd_resp_send_404(req);
-    LOG_AND_RETURN_IF_ERR("fallback_handler", "httpd_resp_send_404", ret);
+    if (ret != ESP_OK)
+        ESP_LOGE(TAG, "fallback_handler: httpd_resp_send_404 failed with code: %d[%s]", ret, esp_err_to_name(ret));
     return ESP_FAIL; // return ESP_FAIL to close underlying socket
 }
 
@@ -66,15 +68,24 @@ static esp_err_t ota_update_handler(httpd_req_t *req)
     if (is_ota_running())
     {
         esp_err_t ret = httpd_resp_send_custom_err(req, "503", "OTA update is already running");
-        LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_resp_send_custom_err", ret);
+        if (ret != ESP_OK)
+            ESP_LOGE(TAG, "ota_update_handler: httpd_resp_send_custom_err failed with code: %d[%s]", ret,
+                     esp_err_to_name(ret));
         return ESP_FAIL; // return ESP_FAIL to close underlying socket
     }
     else
     {
         ota_run();
         esp_err_t ret = httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
-        LOG_AND_RETURN_IF_ERR("ota_update_handler", "httpd_resp_send", ret);
-        return ESP_OK;
+        if (ret == ESP_OK)
+        {
+            return ESP_OK;
+        }
+        else
+        {
+            ESP_LOGE(TAG, "ota_update_handler: httpd_resp_send failed with code: %d[%s]", ret, esp_err_to_name(ret));
+            return ret;
+        }
     }
 }
 
@@ -89,7 +100,6 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     sha256_len = httpd_req_get_hdr_value_len(req, "sha256") + 1;
     if (sha256_len == 0)
     {
-        ESP_LOGE(TAG, "ota_update_handler: No sha256 received");
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing sha256 header");
     }
 
@@ -101,14 +111,23 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     }
 
     esp_err_t ret = httpd_req_get_hdr_value_str(req, "sha256", sha256, sha256_len);
-    LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "httpd_req_get_hdr_value_str", ret, free(sha256));
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_req_get_hdr_value_str failed with code: %d[%s]", ret,
+                 esp_err_to_name(ret));
+        free(sha256);
+        return ret;
+    }
+
     uint8_t sha256_bytes[32];
     ret = parse_sha256(sha256, sha256_len, sha256_bytes);
     free(sha256);
     if (ret != ESP_OK)
     {
-        esp_err_t ret = httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sha256 header");
-        LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "httpd_resp_send_err", ret);
+        esp_err_t http_ret = httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sha256 header");
+        if (http_ret != ESP_OK)
+            ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_resp_send_err failed with code: %d[%s]", http_ret,
+                     esp_err_to_name(http_ret));
         return ret;
     }
 
@@ -116,7 +135,10 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     ret = ota_is_image_up_to_date(sha256_bytes, &is_up_to_date);
     if (ret != ESP_OK)
     {
-        LOG_AND_RETURN_IF_ERR("check_image_up_to_date_handler", "ota_is_image_up_to_date", ret);
+        esp_err_t http_ret = httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sha256 header");
+        if (http_ret != ESP_OK)
+            ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_resp_send_err failed with code: %d[%s]", http_ret,
+                     esp_err_to_name(http_ret));
         return ret;
     }
 
@@ -138,25 +160,24 @@ static esp_err_t logs_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
 
-    char sse_data[64];
-    while (1)
+    esp_err_t res = logger_add_client(req);
+    if (res == ESP_OK)
     {
-        struct timeval tv;
-        gettimeofday(&tv, NULL);             // Get the current time
-        int64_t time_since_boot = tv.tv_sec; // Time since boot in seconds
-        esp_err_t err;
-        int len =
-            snprintf(sse_data, sizeof(sse_data), "data: Time since boot: %" PRIi64 " seconds\n\n", time_since_boot);
-        if ((err = httpd_resp_send_chunk(req, sse_data, len)) != ESP_OK)
-        {
-            ESP_LOGE(TAG, "Failed to send sse data (returned %02X)", err);
-            break;
-        }
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Send data every second
+        return ESP_OK;
     }
+    else
+    {
+        esp_err_t http_res = httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to add client");
+        if (http_res != ESP_OK)
+            ESP_LOGE(TAG, "logs_handler: httpd_resp_send_err failed with code: %d[%s]", http_res,
+                     esp_err_to_name(http_res));
+        return res;
+    }
+}
 
-    httpd_resp_send_chunk(req, NULL, 0); // End response
-    return ESP_OK;
+static void handle_close(httpd_handle_t hd, int sockfd)
+{
+    ESP_LOGI(TAG, "Socket closed");
 }
 
 static httpd_handle_t start_webserver()
@@ -168,7 +189,7 @@ static httpd_handle_t start_webserver()
 
     httpd_ssl_config_t conf = HTTPD_SSL_CONFIG_DEFAULT();
     conf.httpd.uri_match_fn = httpd_uri_match_wildcard;
-
+    conf.httpd.close_fn = handle_close;
     conf.httpd.max_open_sockets = 7; // maxiumum allowed is 7
 
     extern const unsigned char cert_start[] asm("_binary_server_pem_start");
@@ -243,4 +264,6 @@ void server_init(void)
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &connect_handler, &server));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_SERVER_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
+
+    logger_init();
 }

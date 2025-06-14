@@ -5,7 +5,6 @@
 
 #include "ota.h"
 #include "ota_logger.h"
-#include "utils.h"
 
 #define ERR_ALREADY_UPDATED 0xC001C0D1
 
@@ -32,24 +31,44 @@ static esp_err_t get_current_sha256(char sha256[32])
 {
     esp_app_desc_t running_app;
     esp_err_t ret = esp_ota_get_partition_description(esp_ota_get_running_partition(), &running_app);
-    LOG_AND_RETURN_IF_ERR("get_current_sha256", "esp_ota_get_partition_description", ret);
-    memcpy(sha256, running_app.app_elf_sha256, sizeof(running_app.app_elf_sha256));
-    return ret;
+    if (ret == ESP_OK)
+    {
+        memcpy(sha256, running_app.app_elf_sha256, sizeof(running_app.app_elf_sha256));
+        return ESP_OK;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "get_current_sha256: esp_ota_get_partition_description failed with code: %d[%s]", ret,
+                 esp_err_to_name(ret));
+        return ret;
+    }
 }
 
 static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
 {
     esp_err_t ret = esp_https_ota_begin(&ota_config, &ota_handle);
-    LOG_AND_RETURN_IF_ERR("ota_update", "esp_https_ota_begin", ret);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "ota_update: esp_https_ota_begin failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        return ret;
+    }
 
     esp_app_desc_t app_desc;
     ret = esp_https_ota_get_img_desc(ota_handle, &app_desc);
-    LOG_AND_RETURN_IF_ERR("ota_update", "esp_https_ota_get_img_desc", ret);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "ota_update: esp_https_ota_get_img_desc failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        return ret;
+    }
 
     bool is_same;
     ret = ota_is_image_up_to_date(app_desc.app_elf_sha256, &is_same);
-    LOG_AND_RETURN_IF_ERR("ota_update", "ota_is_image_up_to_date", ret);
-    if (is_same)
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "ota_update: ota_is_image_up_to_date failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        return ret;
+    }
+    else if (is_same)
     {
         return ERR_ALREADY_UPDATED;
     }
@@ -66,19 +85,26 @@ static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
     }
 
     ret = esp_https_ota_finish(ota_handle);
-    LOG_AND_RETURN_IF_ERR("ota_update", "esp_https_ota_finish", ret);
-
-    return ESP_OK;
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "ota_update: esp_https_ota_finish failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        return ret;
+    }
+    else
+    {
+        return ESP_OK;
+    }
 }
 
 static void ota_task(void *pvParameters)
 {
+    ESP_LOGI(TAG, "ota_task: Starting OTA update from %s", CONFIG_OTA_PAYLOAD_URL);
+
     TaskHandle_t ota_logger_task_handle;
     ESP_ERROR_CHECK(
         esp_event_handler_register(ESP_HTTPS_OTA_EVENT, ESP_EVENT_ANY_ID, &event_logger, &ota_logger_task_handle));
 
     ota_http_config.url = CONFIG_OTA_PAYLOAD_URL;
-    ESP_LOGI(TAG, "ota_task: Starting OTA update from %s", ota_http_config.url);
     esp_https_ota_handle_t ota_handle;
     esp_err_t ret = ota_update(&ota_handle);
     if (ret == ESP_OK)
@@ -93,7 +119,7 @@ static void ota_task(void *pvParameters)
     }
     else
     {
-        ESP_LOGE(TAG, "ota_task: ota_update failed: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "ota_task: ota_update failed with code: %d[%s]", ret, esp_err_to_name(ret));
     }
 
     s_ota_running = false;
@@ -115,9 +141,17 @@ esp_err_t ota_is_image_up_to_date(uint8_t sha256[32], bool *is_up_to_date)
 {
     char current_sha256[SHA256_CHAR_LENGTH];
     esp_err_t ret = get_current_sha256(current_sha256);
-    LOG_AND_RETURN_IF_ERR("ota_is_image_up_to_date", "get_current_sha256", ret);
-    *is_up_to_date = memcmp(sha256, current_sha256, SHA256_CHAR_LENGTH) == 0;
-    return ESP_OK;
+    if (ret == ESP_OK)
+    {
+        *is_up_to_date = memcmp(sha256, current_sha256, SHA256_CHAR_LENGTH) == 0;
+        return ESP_OK;
+    }
+    else
+    {
+        ESP_LOGE(TAG, "ota_is_image_up_to_date: get_current_sha256 failed with code: %d[%s]", ret,
+                 esp_err_to_name(ret));
+        return ret;
+    }
 }
 
 bool is_ota_running(void)
