@@ -177,7 +177,8 @@ static esp_err_t logs_handler(httpd_req_t *req)
 
 static void handle_close(httpd_handle_t hd, int sockfd)
 {
-    ESP_LOGI(TAG, "Socket closed");
+    ESP_LOGI(TAG, "handle_close: Socket %d closed", sockfd);
+    logger_remove_client_by_sockfd(sockfd);
 }
 
 static httpd_handle_t start_webserver()

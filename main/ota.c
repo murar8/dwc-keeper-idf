@@ -2,6 +2,8 @@
 #include <esp_log.h>
 #include <esp_netif_types.h>
 #include <esp_ota_ops.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/portmacro.h>
 
 #include "ota.h"
 #include "ota_logger.h"
@@ -26,6 +28,7 @@ static esp_https_ota_config_t ota_config = {
 };
 
 static bool s_ota_running = false;
+static portMUX_TYPE s_ota_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static esp_err_t get_current_sha256(char sha256[32])
 {
@@ -161,14 +164,17 @@ bool is_ota_running(void)
 
 void ota_run(void)
 {
+    portENTER_CRITICAL(&s_ota_mux);
     if (s_ota_running)
     {
+        portEXIT_CRITICAL(&s_ota_mux);
         ESP_LOGE(TAG, "ota_run: OTA is already running");
         return;
     }
     else
     {
         s_ota_running = true;
+        portEXIT_CRITICAL(&s_ota_mux);
         xTaskCreate(ota_task, "ota_task", CONFIG_OTA_TASK_STACK_SIZE, NULL, CONFIG_OTA_TASK_PRIORITY, NULL);
     }
 }

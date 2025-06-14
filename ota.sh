@@ -54,4 +54,4 @@ echo
 
 echo
 echo "Update successful! Tailing logs..."
-# curl -N "${CURL_CERTS[@]}" https://${ESP_IP}/logs
+curl -N "${CURL_CERTS[@]}" https://${ESP_IP}/logs
