@@ -1,6 +1,5 @@
 {
   "cmake.cmakePath": "${workspaceFolder}/cmake-wrapper.sh",
-
   "cmake.configureOnOpen": false,
   "cmakeFormat.exePath": "/home/lmurarotto/.espressif/python_env/idf5.4_py3.12_env/bin/cmake-format",
   "python.defaultInterpreterPath": "/home/lmurarotto/.espressif/python_env/idf5.4_py3.12_env/bin/python",

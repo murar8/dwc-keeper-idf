@@ -8,7 +8,6 @@
 #include <sys/time.h>
 #include <sys/types.h>
 
-#include "logger.h"
 #include "ota.h"
 
 static const char *TAG = "server";
@@ -159,26 +158,7 @@ static esp_err_t logs_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "text/event-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
-
-    esp_err_t res = logger_add_client(req);
-    if (res == ESP_OK)
-    {
-        return ESP_OK;
-    }
-    else
-    {
-        esp_err_t http_res = httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to add client");
-        if (http_res != ESP_OK)
-            ESP_LOGE(TAG, "logs_handler: httpd_resp_send_err failed with code: %d[%s]", http_res,
-                     esp_err_to_name(http_res));
-        return res;
-    }
-}
-
-static void handle_close(httpd_handle_t hd, int sockfd)
-{
-    ESP_LOGI(TAG, "handle_close: Socket %d closed", sockfd);
-    logger_remove_client_by_sockfd(sockfd);
+    return ESP_FAIL;
 }
 
 static httpd_handle_t start_webserver()
@@ -190,7 +170,6 @@ static httpd_handle_t start_webserver()
 
     httpd_ssl_config_t conf = HTTPD_SSL_CONFIG_DEFAULT();
     conf.httpd.uri_match_fn = httpd_uri_match_wildcard;
-    conf.httpd.close_fn = handle_close;
     conf.httpd.max_open_sockets = 7; // maxiumum allowed is 7
 
     extern const unsigned char cert_start[] asm("_binary_server_pem_start");
@@ -265,6 +244,4 @@ void server_init(void)
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &connect_handler, &server));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
     ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_SERVER_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-
-    logger_init();
 }
