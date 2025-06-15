@@ -4,6 +4,7 @@
 #include <freertos/task.h>
 
 #include "lcd.h"
+#include "logger.h"
 #include "server.h"
 #include "storage.h"
 #include "wifi.h"
@@ -14,6 +15,7 @@ void app_main(void)
 
     nvs_init();
     wifi_init();
+    logger_init();
     server_init();
     hd44780_t *lcd = lcd_init();
     hd44780_clear(lcd);

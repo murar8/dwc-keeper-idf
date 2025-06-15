@@ -5,9 +5,11 @@
 #include <esp_wifi.h>
 #include <nvs_flash.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 
+#include "logger.h"
 #include "ota.h"
 
 static const char *TAG = "server";
@@ -158,7 +160,44 @@ static esp_err_t logs_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "text/event-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
-    return ESP_FAIL;
+
+    int sockfd = httpd_req_to_sockfd(req);
+
+    esp_err_t ret = logger_add_socket(sockfd);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "logs_handler: logger_add_socket failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        if (ret == ESP_ERR_NO_MEM)
+            httpd_resp_send_custom_err(req, "503", "Too many log connections");
+        return ESP_FAIL;
+    }
+
+    return ESP_OK;
+}
+
+static void global_close_handler(httpd_handle_t server, int sockfd)
+{
+    close(sockfd);
+
+    // Try to remove from logger first (it might not be there)
+    esp_err_t ret = logger_remove_socket(sockfd);
+    if (ret == ESP_ERR_NOT_FOUND)
+    {
+        // Socket was never added to logger - this is normal for non-logger connections
+        return;
+    }
+    else if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "global_close_handler: logger_remove_socket failed with code: %d[%s]", ret, esp_err_to_name(ret));
+    }
+
+    // Always trigger close for proper cleanup
+    ret = httpd_sess_trigger_close(server, sockfd);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "global_close_handler: httpd_sess_trigger_close failed with code: %d[%s]", ret,
+                 esp_err_to_name(ret));
+    }
 }
 
 static httpd_handle_t start_webserver()
@@ -170,7 +209,8 @@ static httpd_handle_t start_webserver()
 
     httpd_ssl_config_t conf = HTTPD_SSL_CONFIG_DEFAULT();
     conf.httpd.uri_match_fn = httpd_uri_match_wildcard;
-    conf.httpd.max_open_sockets = 7; // maxiumum allowed is 7
+    conf.httpd.max_open_sockets = 5; // reduced to prevent system socket exhaustion
+    conf.httpd.close_fn = global_close_handler;
 
     extern const unsigned char cert_start[] asm("_binary_server_pem_start");
     extern const unsigned char cert_end[] asm("_binary_server_pem_end");
