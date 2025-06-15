@@ -162,7 +162,7 @@ static esp_err_t logs_handler(httpd_req_t *req)
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
 
     int sockfd = httpd_req_to_sockfd(req);
-
+    assert(sockfd >= 0);
     esp_err_t ret = logger_add_socket(sockfd);
     if (ret != ESP_OK)
     {
@@ -177,22 +177,17 @@ static esp_err_t logs_handler(httpd_req_t *req)
 
 static void global_close_handler(httpd_handle_t server, int sockfd)
 {
-    close(sockfd);
+    ESP_LOGI(TAG, "global_close_handler: called for socket %d", sockfd);
 
     // Try to remove from logger first (it might not be there)
     esp_err_t ret = logger_remove_socket(sockfd);
-    if (ret == ESP_ERR_NOT_FOUND)
-    {
-        // Socket was never added to logger - this is normal for non-logger connections
-        return;
-    }
-    else if (ret != ESP_OK)
+    if (ret != ESP_OK && ret != ESP_ERR_NOT_FOUND)
     {
         ESP_LOGE(TAG, "global_close_handler: logger_remove_socket failed with code: %d[%s]", ret, esp_err_to_name(ret));
     }
 
-    // Always trigger close for proper cleanup
-    ret = httpd_sess_trigger_close(server, sockfd);
+    // For /logs connections, use httpd_sess_trigger_close
+    ret = httpd_sess_trigger_close(server, sockfd) || close(sockfd);
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "global_close_handler: httpd_sess_trigger_close failed with code: %d[%s]", ret,

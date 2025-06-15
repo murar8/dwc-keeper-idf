@@ -3,10 +3,8 @@
 #include "freertos/ringbuf.h"
 #include "freertos/task.h"
 #include "lwip/sys.h"
-#include <string.h>
-
-// tcp send
 #include <lwip/sockets.h>
+#include <string.h>
 
 #define CONFIG_LOG_BUFFER_SIZE_BYTES 1024
 #define CONFIG_LOG_MAX_SOCKETS 3
@@ -116,6 +114,7 @@ esp_err_t logger_remove_socket(int socket)
         return ESP_FAIL;
     }
 
+    ESP_LOGI(TAG, "logger_remove_socket: socket %d removed from index %d", socket, socket_index);
     return ESP_OK;
 }
 
@@ -139,7 +138,11 @@ static void send_logs_to_sockets_task(void *arg)
         {
             if (sockets[i] == -1)
                 continue;
-            send(sockets[i], buffer, size, 0);
+
+            // Send with MSG_DONTWAIT to avoid blocking on dead sockets
+            int result = send(sockets[i], buffer, size, MSG_DONTWAIT);
+            if (result < 0 && (errno == EBADF || errno == ENOTCONN || errno == EPIPE))
+                ESP_LOGW(TAG, "send_logs_to_sockets_task: Socket %d is dead", sockets[i]);
         }
 
         ret = xSemaphoreGive(socket_semaphore);
