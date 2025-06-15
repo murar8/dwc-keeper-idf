@@ -1,5 +1,6 @@
 idf_component_register(
   SRCS
+  "heap_debug.c"
   "server.c"
   "wifi.c"
   "main.c"

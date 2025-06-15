@@ -3,6 +3,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
+#include "heap_debug.h"
 #include "lcd.h"
 #include "logger.h"
 #include "server.h"
@@ -19,4 +20,7 @@ void app_main(void)
     server_init();
     hd44780_t *lcd = lcd_init();
     hd44780_clear(lcd);
+    
+    // Start heap monitoring
+    start_heap_monitor();
 }
