@@ -21,16 +21,16 @@ static esp_err_t parse_sha256(const char *sha256, size_t sha256_len, uint8_t *sh
         ESP_LOGE(TAG, "parse_sha256: Invalid sha256 length: %d", sha256_len);
         return ESP_FAIL;
     }
-    if (sscanf(sha256,
-               "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
-               "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx",
-               &sha256_bytes[0], &sha256_bytes[1], &sha256_bytes[2], &sha256_bytes[3], &sha256_bytes[4],
-               &sha256_bytes[5], &sha256_bytes[6], &sha256_bytes[7], &sha256_bytes[8], &sha256_bytes[9],
-               &sha256_bytes[10], &sha256_bytes[11], &sha256_bytes[12], &sha256_bytes[13], &sha256_bytes[14],
-               &sha256_bytes[15], &sha256_bytes[16], &sha256_bytes[17], &sha256_bytes[18], &sha256_bytes[19],
-               &sha256_bytes[20], &sha256_bytes[21], &sha256_bytes[22], &sha256_bytes[23], &sha256_bytes[24],
-               &sha256_bytes[25], &sha256_bytes[26], &sha256_bytes[27], &sha256_bytes[28], &sha256_bytes[29],
-               &sha256_bytes[30], &sha256_bytes[31]) != 32)
+    else if (sscanf(sha256,
+                    "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx"
+                    "%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx%02hhx",
+                    &sha256_bytes[0], &sha256_bytes[1], &sha256_bytes[2], &sha256_bytes[3], &sha256_bytes[4],
+                    &sha256_bytes[5], &sha256_bytes[6], &sha256_bytes[7], &sha256_bytes[8], &sha256_bytes[9],
+                    &sha256_bytes[10], &sha256_bytes[11], &sha256_bytes[12], &sha256_bytes[13], &sha256_bytes[14],
+                    &sha256_bytes[15], &sha256_bytes[16], &sha256_bytes[17], &sha256_bytes[18], &sha256_bytes[19],
+                    &sha256_bytes[20], &sha256_bytes[21], &sha256_bytes[22], &sha256_bytes[23], &sha256_bytes[24],
+                    &sha256_bytes[25], &sha256_bytes[26], &sha256_bytes[27], &sha256_bytes[28], &sha256_bytes[29],
+                    &sha256_bytes[30], &sha256_bytes[31]) != 32)
     {
         ESP_LOGE(TAG, "parse_sha256: Invalid sha256");
         return ESP_FAIL;
@@ -38,20 +38,6 @@ static esp_err_t parse_sha256(const char *sha256, size_t sha256_len, uint8_t *sh
     else
     {
         return ESP_OK;
-    }
-}
-
-static void event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    if (event_base == ESP_HTTPS_SERVER_EVENT)
-    {
-        if (event_id == HTTPS_SERVER_EVENT_ERROR)
-        {
-            esp_https_server_last_error_t *last_error = (esp_tls_last_error_t *)event_data;
-            ESP_LOGE(TAG, "event_handler: last_error = %s, last_tls_err = %d, tls_flag = %d",
-                     esp_err_to_name(last_error->last_error), last_error->esp_tls_error_code,
-                     last_error->esp_tls_flags);
-        }
     }
 }
 
@@ -71,7 +57,6 @@ static esp_err_t favicon_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-// call ota_task with the provided payload url
 static esp_err_t ota_update_handler(httpd_req_t *req)
 {
     if (is_ota_running())
@@ -82,19 +67,18 @@ static esp_err_t ota_update_handler(httpd_req_t *req)
                      esp_err_to_name(ret));
         return ESP_FAIL;
     }
+
+    ota_run();
+    esp_err_t ret = httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
+    if (ret == ESP_OK)
+    {
+        ESP_LOGI(TAG, "ota_update_handler: OTA update started");
+        return ESP_OK;
+    }
     else
     {
-        ota_run();
-        esp_err_t ret = httpd_resp_send(req, "OTA update started", HTTPD_RESP_USE_STRLEN);
-        if (ret == ESP_OK)
-        {
-            return ESP_OK;
-        }
-        else
-        {
-            ESP_LOGE(TAG, "ota_update_handler: httpd_resp_send failed with code: %d[%s]", ret, esp_err_to_name(ret));
-            return ret;
-        }
+        ESP_LOGE(TAG, "ota_update_handler: httpd_resp_send failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        return ESP_FAIL;
     }
 }
 
@@ -115,8 +99,8 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     char *sha256 = calloc(1, sha256_len);
     if (!sha256)
     {
-        ESP_LOGE(TAG, "ota_update_handler: Not enough memory for sha256");
-        return ESP_ERR_NO_MEM;
+        ESP_LOGE(TAG, "check_image_up_to_date_handler: Not enough memory for sha256");
+        return ESP_FAIL;
     }
 
     esp_err_t ret = httpd_req_get_hdr_value_str(req, "sha256", sha256, sha256_len);
@@ -129,12 +113,12 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
         free(sha256);
         return ESP_FAIL;
     }
-    else if (ret != ESP_OK)
+    if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_req_get_hdr_value_str failed with code: %d[%s]", ret,
                  esp_err_to_name(ret));
         free(sha256);
-        return ret;
+        return ESP_FAIL;
     }
 
     uint8_t sha256_bytes[32];
@@ -146,7 +130,7 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
         if (http_ret != ESP_OK)
             ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_resp_send_err failed with code: %d[%s]", http_ret,
                      esp_err_to_name(http_ret));
-        return ret;
+        return ESP_FAIL;
     }
 
     bool is_up_to_date;
@@ -157,7 +141,7 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
         if (http_ret != ESP_OK)
             ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_resp_send_err failed with code: %d[%s]", http_ret,
                      esp_err_to_name(http_ret));
-        return ret;
+        return ESP_FAIL;
     }
 
     if (is_up_to_date)
@@ -174,60 +158,37 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
 
 static esp_err_t logs_handler(httpd_req_t *in_req)
 {
-    httpd_req_t *req;
-    esp_err_t ret = httpd_req_async_handler_begin(in_req, &req);
-    if (ret != ESP_OK)
+    esp_err_t ret = logger_add_client(in_req);
+    if (ret == ESP_OK)
     {
-        ESP_LOGE(TAG, "logs_handler: httpd_req_async_handler_begin failed with code: %d[%s]", ret,
-                 esp_err_to_name(ret));
-        return ret;
+        return ESP_OK;
     }
-
-    httpd_resp_set_type(req, "text/event-stream");
-    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
-    httpd_resp_set_hdr(req, "Connection", "keep-alive");
-
-    ret = httpd_resp_send_chunk(req, "data: connected\n\n", 17);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(TAG, "logs_handler: httpd_resp_send_chunk failed with code: %d[%s]", ret, esp_err_to_name(ret));
-        httpd_req_async_handler_complete(req);
-        return ret;
-    }
-
-    ret = logger_add_client(req);
-    if (ret != ESP_OK)
+    else
     {
         ESP_LOGE(TAG, "logs_handler: logger_add_socket failed with code: %d[%s]", ret, esp_err_to_name(ret));
-        if (ret == ESP_ERR_NO_MEM)
-            httpd_resp_send_custom_err(req, "503", "Too many log connections");
-        httpd_req_async_handler_complete(req);
-        return ESP_FAIL;
+        return ret;
     }
-
-    return ESP_OK;
 }
 
 static esp_err_t logs_viewer_handler(httpd_req_t *in_req)
 {
     extern const unsigned char index_html_start[] asm("_binary_index_html_start");
     extern const unsigned char index_html_end[] asm("_binary_index_html_end");
-
     esp_err_t ret = httpd_resp_send(in_req, (const char *)index_html_start, index_html_end - index_html_start);
-    if (ret != ESP_OK)
+    if (ret == ESP_OK)
+    {
+        return ESP_OK;
+    }
+    else
     {
         ESP_LOGE(TAG, "logs_viewer_handler: httpd_resp_send failed with code: %d[%s]", ret, esp_err_to_name(ret));
         return ESP_FAIL;
     }
-
-    return ESP_OK;
 }
 
 static httpd_handle_t start_webserver()
 {
-    httpd_handle_t server = NULL;
 
-    // Start the httpd server
     ESP_LOGI(TAG, "Starting server");
 
     httpd_ssl_config_t conf = HTTPD_SSL_CONFIG_DEFAULT();
@@ -249,12 +210,8 @@ static httpd_handle_t start_webserver()
     conf.cacert_pem = ca_cert_start;
     conf.cacert_len = ca_cert_end - ca_cert_start;
 
-    esp_err_t ret = httpd_ssl_start(&server, &conf);
-    if (ESP_OK != ret)
-    {
-        ESP_LOGI(TAG, "Error starting server!");
-        return NULL;
-    }
+    httpd_handle_t server = NULL;
+    ESP_ERROR_CHECK(httpd_ssl_start(&server, &conf));
 
     ESP_LOGI(TAG, "Registering URI handlers");
 
@@ -287,13 +244,14 @@ static void disconnect_handler(void *arg, esp_event_base_t event_base, int32_t e
     httpd_handle_t *server = (httpd_handle_t *)arg;
     if (*server)
     {
-        if (stop_webserver(*server) == ESP_OK)
+        esp_err_t ret = stop_webserver(*server);
+        if (ret == ESP_OK)
         {
             *server = NULL;
         }
         else
         {
-            ESP_LOGE(TAG, "Failed to stop https server");
+            ESP_LOGE(TAG, "disconnect_handler: stop_webserver failed with code: %d[%s]", ret, esp_err_to_name(ret));
         }
     }
 }
@@ -305,13 +263,15 @@ static void connect_handler(void *arg, esp_event_base_t event_base, int32_t even
     {
         *server = start_webserver();
     }
+    else
+    {
+        ESP_LOGW(TAG, "connect_handler: server already started");
+    }
 }
 
 void server_init(void)
 {
     static httpd_handle_t server = NULL;
-
     ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &connect_handler, &server));
     ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, &disconnect_handler, &server));
-    ESP_ERROR_CHECK(esp_event_handler_register(ESP_HTTPS_SERVER_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
 }
