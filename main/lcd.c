@@ -1,6 +1,6 @@
-#include <driver/gpio.h>
-
 #include "lcd.h"
+
+#include <driver/gpio.h>
 
 static hd44780_t lcd = {
     .write_cb = NULL,

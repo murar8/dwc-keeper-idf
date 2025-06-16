@@ -1,12 +1,11 @@
+#include "ota.h"
+#include "ota_logger.h"
+
 #include <esp_https_ota.h>
 #include <esp_log.h>
-#include <esp_netif_types.h>
 #include <esp_ota_ops.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/portmacro.h>
-
-#include "ota.h"
-#include "ota_logger.h"
 
 #define ERR_ALREADY_UPDATED 0xC001C0D1
 
@@ -78,7 +77,7 @@ static esp_err_t ota_update(esp_https_ota_handle_t ota_handle)
 
     while (esp_https_ota_perform(ota_handle) == ESP_ERR_HTTPS_OTA_IN_PROGRESS)
     {
-        ESP_LOGD(TAG, "ota_update: esp_https_ota_perform: %s", esp_err_to_name(ret));
+        ESP_LOGD(TAG, "ota_update: OTA in progress");
     }
 
     if (!esp_https_ota_is_complete_data_received(ota_handle))
@@ -113,16 +112,16 @@ static void ota_task(void *pvParameters)
     if (ret == ESP_OK)
     {
         ESP_LOGI(TAG, "ota_task: ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(1000));
         esp_restart();
     }
     else if (ret == ERR_ALREADY_UPDATED)
     {
-        ESP_LOGI(TAG, "ota_update: Already up to date, skipping update.");
+        ESP_LOGI(TAG, "ota_task: Already up to date, skipping update.");
     }
     else
     {
-        ESP_LOGE(TAG, "ota_task: ota_update failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        ESP_LOGE(TAG, "ota_task: OTA failed with code: %d[%s]", ret, esp_err_to_name(ret));
     }
 
     s_ota_running = false;

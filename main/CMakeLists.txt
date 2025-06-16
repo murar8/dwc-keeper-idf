@@ -9,6 +9,7 @@ idf_component_register(
   "ota_logger.c"
   "storage.c"
   "logger.c"
+  "sha_util.c"
   INCLUDE_DIRS
   "."
   EMBED_TXTFILES

@@ -1,11 +1,12 @@
 #include "logger.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/ringbuf.h"
-#include "freertos/task.h"
-#include "lwip/sys.h"
-#include "sdkconfig.h"
+
+#include <esp_event.h>
+#include <esp_log.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/ringbuf.h>
+#include <freertos/task.h>
+#include <lwip/sys.h>
+#include <sdkconfig.h>
 #include <lwip/sockets.h>
 #include <stdbool.h>
 #include <string.h>
@@ -135,7 +136,7 @@ esp_err_t logger_remove_client(httpd_req_t *req)
 
 static void send_logs_to_clients_task(void *arg)
 {
-    while (1)
+    for (;;)
     {
         size_t size;
         char *buffer;
@@ -196,9 +197,9 @@ static void send_logs_to_clients_task(void *arg)
 
 static void print_vprintf_stats_task(void *arg)
 {
-    while (1)
+    for (;;)
     {
-        vTaskDelay(pdMS_TO_TICKS(30000));
+        vTaskDelay(pdMS_TO_TICKS(CONFIG_LOG_PRINT_STATS_INTERVAL_MS));
         if (vprintf_failed_allocations > 0)
         {
             ESP_LOGE(TAG, "print_vprintf_stats_task: Failed to allocate %d times", vprintf_failed_allocations);
@@ -214,7 +215,6 @@ static void print_vprintf_stats_task(void *arg)
 
 void logger_init(void)
 {
-    esp_log_level_set(TAG, ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "logger_init: start");
     for (int i = 0; i < CONFIG_LOG_MAX_SOCKETS; i++)
         client_semaphores[i] = xSemaphoreCreateMutex();

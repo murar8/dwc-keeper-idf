@@ -1,6 +1,7 @@
-#include <nvs_flash.h>
-
 #include "storage.h"
+
+#include <esp_log.h>
+#include <nvs_flash.h>
 
 void nvs_init(void)
 {

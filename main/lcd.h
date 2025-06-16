@@ -1,6 +1,6 @@
-#include <hd44780.h>
-
 #pragma once
+
+#include <hd44780.h>
 
 #define LCD_FONT HD44780_FONT_5X8
 #define LCD_LINES 2

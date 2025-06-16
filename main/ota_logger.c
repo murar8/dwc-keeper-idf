@@ -1,3 +1,5 @@
+#include "ota_logger.h"
+
 #include <esp_https_ota.h>
 #include <esp_log.h>
 #include <esp_ota_ops.h>

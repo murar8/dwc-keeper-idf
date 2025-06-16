@@ -5,13 +5,13 @@ menu "DWC Keeper Configuration"
             int "WiFi Task Stack Size"
             default 4096
             help
-                Stack size for WiFi related tasks in bytes.
+                Stack size for WiFi task in bytes.
 
         config WIFI_TASK_PRIORITY
             int "WiFi Task Priority"
             default 3
             help
-                Priority for WiFi related tasks.
+                Priority for WiFi task.
 
         config WIFI_STATIC_IP
             string "Static IP Address"
@@ -111,7 +111,13 @@ menu "DWC Keeper Configuration"
             int "Log Print Stats Task Priority"
             default 0
             help
-                Priority for the log print stats task.
+                Priority for failed allocations and sends log print stats task.
+
+        config LOG_PRINT_STATS_INTERVAL_MS
+            int "Log Print Stats Interval (ms)"
+            default 30000
+            help
+                Interval between failed allocations and sends log print stats in milliseconds.
     endmenu
 
     menu "Server Configuration"
@@ -128,6 +134,18 @@ menu "DWC Keeper Configuration"
             default 10000
             help
                 Interval between heap status reports in milliseconds.
+
+        config HEAP_MONITOR_TASK_STACK_SIZE
+            int "Heap Monitor Task Stack Size"
+            default 2048
+            help
+                Stack size for the heap monitor task in bytes.
+
+        config HEAP_MONITOR_TASK_PRIORITY
+            int "Heap Monitor Task Priority"
+            default 0
+            help
+                Priority for the heap monitor task.
     endmenu
 
 endmenu

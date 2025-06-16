@@ -2,6 +2,8 @@
 #include <esp_netif.h>
 #include <esp_smartconfig.h>
 #include <esp_wifi.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/event_groups.h>
 #include <string.h>
 
 /*
@@ -24,7 +26,7 @@ static void smartconfig_task(void *parm)
     ESP_ERROR_CHECK(esp_smartconfig_set_type(SC_TYPE_ESPTOUCH_V2));
     smartconfig_start_config_t cfg = SMARTCONFIG_START_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_smartconfig_start(&cfg));
-    while (1)
+    for (;;)
     {
         uxBits = xEventGroupWaitBits(s_wifi_event_group, CONNECTED_BIT | ESPTOUCH_DONE_BIT, true, false, portMAX_DELAY);
         if (uxBits & CONNECTED_BIT)
