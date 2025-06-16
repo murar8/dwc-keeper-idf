@@ -201,13 +201,13 @@ static void print_vprintf_stats_task(void *arg)
         vTaskDelay(pdMS_TO_TICKS(30000));
         if (vprintf_failed_allocations > 0)
         {
-            vprintf_failed_allocations = 0;
             ESP_LOGE(TAG, "print_vprintf_stats_task: Failed to allocate %d times", vprintf_failed_allocations);
+            vprintf_failed_allocations = 0;
         }
         if (vprintf_failed_sends > 0)
         {
-            vprintf_failed_sends = 0;
             ESP_LOGE(TAG, "print_vprintf_stats_task: Failed to send %d times", vprintf_failed_sends);
+            vprintf_failed_sends = 0;
         }
     }
 }
@@ -222,6 +222,6 @@ void logger_init(void)
     esp_log_set_vprintf(logger_vprintf);
     xTaskCreate(send_logs_to_clients_task, "send_logs_to_clients_task", CONFIG_LOG_SEND_TASK_STACK_SIZE, NULL,
                 CONFIG_LOG_SEND_TASK_PRIORITY, NULL);
-    xTaskCreate(print_vprintf_stats_task, "print_vprintf_stats_task", CONFIG_ESP32_PTHREAD_STACK_MIN, NULL,
-                CONFIG_LOG_SEND_TASK_PRIORITY, NULL);
+    xTaskCreate(print_vprintf_stats_task, "print_vprintf_stats_task", CONFIG_LOG_PRINT_STATS_TASK_STACK_SIZE, NULL,
+                CONFIG_LOG_PRINT_STATS_TASK_PRIORITY, NULL);
 }

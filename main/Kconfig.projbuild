@@ -100,6 +100,18 @@ menu "DWC Keeper Configuration"
             default 0
             help
                 Priority for the log sending task.
+
+        config LOG_PRINT_STATS_TASK_STACK_SIZE
+            int "Log Print Stats Task Stack Size"
+            default 2048
+            help
+                Stack size for the log print stats task in bytes.
+
+        config LOG_PRINT_STATS_TASK_PRIORITY
+            int "Log Print Stats Task Priority"
+            default 0
+            help
+                Priority for the log print stats task.
     endmenu
 
     menu "Server Configuration"
@@ -108,6 +120,14 @@ menu "DWC Keeper Configuration"
             default 5
             help
                 Maximum number of async HTTP requests that can be handled simultaneously.
+    endmenu
+
+    menu "Heap Monitor Configuration"
+        config HEAP_MONITOR_INTERVAL_MS
+            int "Heap Monitor Interval (ms)"
+            default 10000
+            help
+                Interval between heap status reports in milliseconds.
     endmenu
 
 endmenu
