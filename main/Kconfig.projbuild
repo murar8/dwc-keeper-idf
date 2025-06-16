@@ -70,4 +70,38 @@ menu "DWC Keeper Configuration"
                 URL to the OTA payload.
     endmenu
 
+    menu "Logger Configuration"
+        config LOG_BUFFER_SIZE_BYTES
+            int "Log Buffer Size (bytes)"
+            default 1024
+            help
+                Size of the ring buffer for storing log messages in bytes.
+
+        config LOG_MAX_SOCKETS
+            int "Maximum Log Sockets"
+            default 3
+            help
+                Maximum number of sockets that can receive log streams simultaneously.
+
+        config LOG_SEND_TASK_STACK_SIZE
+            int "Log Send Task Stack Size"
+            default 4096
+            help
+                Stack size for the log sending task in bytes.
+
+        config LOG_SEND_TASK_PRIORITY
+            int "Log Send Task Priority"
+            default 0
+            help
+                Priority for the log sending task.
+    endmenu
+
+    menu "Server Configuration"
+        config MAX_ASYNC_REQUESTS
+            int "Maximum Async Requests"
+            default 5
+            help
+                Maximum number of async HTTP requests that can be handled simultaneously.
+    endmenu
+
 endmenu

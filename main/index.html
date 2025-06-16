@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ESP-IDF Logs</title>
+  </head>
+  <body>
+    <div id="target">Logs</div>
+    <script>
+      setTimeout(function () {
+        var source = new EventSource("/logs");
+        source.addEventListener(
+          "message",
+          (e) => {
+            console.log("message", e.data);
+          },
+          false
+        );
+        source.addEventListener(
+          "error",
+          (e) => {
+            console.log("error", e.message);
+          },
+          false
+        );
+        source.addEventListener("open", () => {
+          console.log("open");
+        });
+        source.addEventListener("close", () => {
+          console.log("close");
+        });
+        source.addEventListener("error", (e) => {
+          console.log("error", e.message);
+        });
+      }, 5000);
+    </script>
+  </body>
+</html>

@@ -1,165 +1,165 @@
+#include "logger.h"
+#include "esp_event.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/ringbuf.h"
 #include "freertos/task.h"
 #include "lwip/sys.h"
+#include "sdkconfig.h"
 #include <lwip/sockets.h>
+#include <stdbool.h>
 #include <string.h>
-
-#define CONFIG_LOG_BUFFER_SIZE_BYTES 1024
-#define CONFIG_LOG_MAX_SOCKETS 3
-
-#define CONFIG_LOG_MAX_WAIT_TIME_MS 100
-
-#define CONFIG_LOG_SEND_TASK_STACK_SIZE 2048
-#define CONFIG_LOG_SEND_TASK_PRIORITY 0
 
 static const char *TAG = "logger";
 
 static RingbufHandle_t log_buffer;
 
-static int socket_count = 0;
-static int sockets[CONFIG_LOG_MAX_SOCKETS];
-static SemaphoreHandle_t socket_semaphore;
+static httpd_req_t *clients[CONFIG_LOG_MAX_SOCKETS] = {NULL};
+static SemaphoreHandle_t client_semaphores[CONFIG_LOG_MAX_SOCKETS];
 
 static int logger_vprintf(const char *fmt, va_list args)
 {
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int len = vprintf(fmt, args_copy);
+    va_end(args_copy);
 
-    int len = vprintf(fmt, args);
+    if (len < 0)
+        return len;
+
     char *buffer = malloc(len + 1);
+
+    if (!buffer)
+        return len;
+
     vsnprintf(buffer, len + 1, fmt, args);
-    int sent = xRingbufferSend(log_buffer, buffer, len + 1, 0);
-    if (sent == pdFALSE)
-        free(buffer);
+
+    xRingbufferSend(log_buffer, buffer, len + 1, 0 /* no wait */);
+
+    free(buffer);
+
     return len;
 }
 
-esp_err_t logger_add_socket(int socket)
+esp_err_t logger_add_client(httpd_req_t *req)
 {
-    int ret = xSemaphoreTake(socket_semaphore, pdMS_TO_TICKS(100));
-    if (ret == pdFALSE)
+    for (int i = 0;; i++)
     {
-        ESP_LOGE(TAG, "logger_add_socket: xSemaphoreTake failed");
-        return ESP_FAIL;
-    }
-
-    int socket_index = -1;
-    for (int i = 0; i < CONFIG_LOG_MAX_SOCKETS; i++)
-    {
-        if (sockets[i] == -1)
+        if (i == CONFIG_LOG_MAX_SOCKETS)
         {
-            socket_index = i;
-            break;
+            ESP_LOGE(TAG, "logger_add_client: No free client index found");
+            return ESP_ERR_NO_MEM;
         }
-    }
 
-    if (socket_index == -1)
-    {
-        ret = xSemaphoreGive(socket_semaphore);
-        if (ret == pdFALSE)
+        while (!xSemaphoreTake(client_semaphores[i], portMAX_DELAY))
+            ESP_LOGD(TAG, "logger_add_client: waiting for semaphore %d", i);
+
+        if (clients[i] != NULL)
         {
-            ESP_LOGE(TAG, "logger_add_socket: xSemaphoreGive failed");
+            xSemaphoreGive(client_semaphores[i]);
+            continue;
         }
-        ESP_LOGE(TAG, "logger_add_socket: No free socket index found");
-        return ESP_ERR_NO_MEM;
+
+        clients[i] = req;
+        xSemaphoreGive(client_semaphores[i]);
+        ESP_LOGI(TAG, "logger_add_client: client %d added", i);
+        return ESP_OK;
     }
-
-    sockets[socket_index] = socket;
-    socket_count++;
-
-    ret = xSemaphoreGive(socket_semaphore);
-    if (ret == pdFALSE)
-    {
-        ESP_LOGE(TAG, "logger_add_socket: xSemaphoreGive failed");
-        return ESP_FAIL;
-    }
-
-    ESP_LOGI(TAG, "logger_add_socket: socket %d added", socket);
-    return ESP_OK;
 }
 
-esp_err_t logger_remove_socket(int socket)
+esp_err_t logger_remove_client(httpd_req_t *req)
 {
-    int ret = xSemaphoreTake(socket_semaphore, pdMS_TO_TICKS(100));
-    if (ret == pdFALSE)
+    for (int i = 0;; i++)
     {
-        ESP_LOGE(TAG, "logger_remove_socket: xSemaphoreTake failed");
-        return ESP_FAIL;
-    }
-
-    int socket_index = -1;
-    for (int i = 0; i < CONFIG_LOG_MAX_SOCKETS; i++)
-    {
-        if (sockets[i] == socket)
+        if (i == CONFIG_LOG_MAX_SOCKETS)
         {
-            socket_index = i;
-            break;
+            return ESP_ERR_NOT_FOUND;
         }
-    }
-    if (socket_index == -1)
-    {
-        ret = xSemaphoreGive(socket_semaphore);
-        if (ret == pdFALSE)
-            ESP_LOGE(TAG, "logger_remove_socket: xSemaphoreGive failed");
-        return ESP_ERR_NOT_FOUND;
-    }
 
-    sockets[socket_index] = -1;
-    socket_count--;
+        while (!xSemaphoreTake(client_semaphores[i], portMAX_DELAY))
+            ESP_LOGD(TAG, "logger_remove_client: waiting for semaphore %d", i);
 
-    ret = xSemaphoreGive(socket_semaphore);
-    if (ret == pdFALSE)
-    {
-        ESP_LOGE(TAG, "logger_remove_socket: xSemaphoreGive failed");
-        return ESP_FAIL;
+        if (clients[i] != req)
+        {
+            xSemaphoreGive(client_semaphores[i]);
+            continue;
+        }
+
+        httpd_req_t *req = clients[i];
+        clients[i] = NULL;
+        xSemaphoreGive(client_semaphores[i]);
+        ESP_LOGI(TAG, "logger_remove_client: client %d removed", i);
+        esp_err_t err = httpd_req_async_handler_complete(req);
+        if (err != ESP_OK)
+            ESP_LOGE(TAG, "logger_remove_client: httpd_req_async_handler_complete failed with code: %d[%s]", err,
+                     esp_err_to_name(err));
+        return ESP_OK;
     }
-
-    ESP_LOGI(TAG, "logger_remove_socket: socket %d removed from index %d", socket, socket_index);
-    return ESP_OK;
 }
 
-static void send_logs_to_sockets_task(void *arg)
+static void send_logs_to_clients_task(void *arg)
 {
     while (1)
     {
         size_t size;
-        char *buffer = xRingbufferReceive(log_buffer, &size, pdMS_TO_TICKS(CONFIG_LOG_MAX_WAIT_TIME_MS));
-        if (buffer == NULL)
-            continue;
-
-        int ret = xSemaphoreTake(socket_semaphore, portMAX_DELAY);
-        if (ret == pdFALSE)
+        char *buffer;
+        do
         {
-            ESP_LOGE(TAG, "send_logs_to_sockets_task: xSemaphoreTake failed");
-            continue;
-        }
+            buffer = xRingbufferReceive(log_buffer, &size, portMAX_DELAY);
+        } while (buffer == NULL);
 
         for (int i = 0; i < CONFIG_LOG_MAX_SOCKETS; i++)
         {
-            if (sockets[i] == -1)
+            while (!xSemaphoreTake(client_semaphores[i], portMAX_DELAY))
+                ESP_LOGD(TAG, "send_logs_to_clients_task: waiting for semaphore %d", i);
+
+            if (clients[i] == NULL)
+            {
+                xSemaphoreGive(client_semaphores[i]);
                 continue;
+            }
 
-            // Send with MSG_DONTWAIT to avoid blocking on dead sockets
-            int result = send(sockets[i], buffer, size, MSG_DONTWAIT);
-            if (result < 0 && (errno == EBADF || errno == ENOTCONN || errno == EPIPE))
-                ESP_LOGW(TAG, "send_logs_to_sockets_task: Socket %d is dead", sockets[i]);
+            // Format log data as SSE event
+            char *sse_buffer = malloc(size + 20); // Extra space for "data: " prefix and "\n\n" suffix
+            if (!sse_buffer)
+            {
+                ESP_LOGE(TAG, "send_logs_to_clients_task: Failed to allocate SSE buffer");
+                xSemaphoreGive(client_semaphores[i]);
+                continue;
+            }
+
+            // Format as SSE: "data: <log message>\n\n"
+            int sse_len = snprintf(sse_buffer, size + 20, "data: %.*s\n\n", (int)(size - 1), buffer);
+
+            esp_err_t err = httpd_resp_send_chunk(clients[i], sse_buffer, sse_len);
+            free(sse_buffer);
+            if (err != ESP_OK)
+            {
+                ESP_LOGE(TAG, "send_logs_to_clients_task: httpd_resp_send_chunk failed with code: %d[%s]", err,
+                         esp_err_to_name(err));
+                xSemaphoreGive(client_semaphores[i]);
+                err = logger_remove_client(clients[i]);
+                if (err != ESP_OK)
+                    ESP_LOGE(TAG, "send_logs_to_clients_task: logger_remove_client failed with code: %d[%s]", err,
+                             esp_err_to_name(err));
+                continue;
+            }
+
+            xSemaphoreGive(client_semaphores[i]);
         }
 
-        ret = xSemaphoreGive(socket_semaphore);
-        if (ret == pdFALSE)
-        {
-            ESP_LOGE(TAG, "send_logs_to_sockets_task: xSemaphoreGive failed");
-        }
+        vRingbufferReturnItem(log_buffer, buffer);
     }
 }
 
 void logger_init(void)
 {
+    esp_log_level_set(TAG, ESP_LOG_DEBUG);
     ESP_LOGI(TAG, "logger_init: start");
-    socket_semaphore = xSemaphoreCreateMutex();
-    memset(sockets, -1, sizeof(sockets));
-    log_buffer = xRingbufferCreate(CONFIG_LOG_BUFFER_SIZE_BYTES, RINGBUF_TYPE_NOSPLIT);
+    for (int i = 0; i < CONFIG_LOG_MAX_SOCKETS; i++)
+        client_semaphores[i] = xSemaphoreCreateMutex();
+    log_buffer = xRingbufferCreate(CONFIG_LOG_BUFFER_SIZE_BYTES, RINGBUF_TYPE_BYTEBUF);
     esp_log_set_vprintf(logger_vprintf);
-    xTaskCreate(send_logs_to_sockets_task, "send_logs_to_sockets_task", CONFIG_LOG_SEND_TASK_STACK_SIZE, NULL,
+    xTaskCreate(send_logs_to_clients_task, "send_logs_to_clients_task", CONFIG_LOG_SEND_TASK_STACK_SIZE, NULL,
                 CONFIG_LOG_SEND_TASK_PRIORITY, NULL);
 }

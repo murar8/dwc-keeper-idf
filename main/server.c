@@ -60,7 +60,15 @@ static esp_err_t fallback_handler(httpd_req_t *req)
     esp_err_t ret = httpd_resp_send_404(req);
     if (ret != ESP_OK)
         ESP_LOGE(TAG, "fallback_handler: httpd_resp_send_404 failed with code: %d[%s]", ret, esp_err_to_name(ret));
-    return ESP_FAIL; // return ESP_FAIL to close underlying socket
+    return ESP_FAIL;
+}
+
+static esp_err_t favicon_handler(httpd_req_t *req)
+{
+    esp_err_t ret = httpd_resp_send_404(req);
+    if (ret != ESP_OK)
+        ESP_LOGE(TAG, "favicon_handler: httpd_resp_send_404 failed with code: %d[%s]", ret, esp_err_to_name(ret));
+    return ESP_OK;
 }
 
 // call ota_task with the provided payload url
@@ -72,7 +80,7 @@ static esp_err_t ota_update_handler(httpd_req_t *req)
         if (ret != ESP_OK)
             ESP_LOGE(TAG, "ota_update_handler: httpd_resp_send_custom_err failed with code: %d[%s]", ret,
                      esp_err_to_name(ret));
-        return ESP_FAIL; // return ESP_FAIL to close underlying socket
+        return ESP_FAIL;
     }
     else
     {
@@ -112,7 +120,16 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     }
 
     esp_err_t ret = httpd_req_get_hdr_value_str(req, "sha256", sha256, sha256_len);
-    if (ret != ESP_OK)
+    if (ret == ESP_ERR_NOT_FOUND)
+    {
+        esp_err_t http_ret = httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing sha256 header");
+        if (http_ret != ESP_OK)
+            ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_resp_send_err failed with code: %d[%s]", http_ret,
+                     esp_err_to_name(http_ret));
+        free(sha256);
+        return ESP_FAIL;
+    }
+    else if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_req_get_hdr_value_str failed with code: %d[%s]", ret,
                  esp_err_to_name(ret));
@@ -155,44 +172,55 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     }
 }
 
-static esp_err_t logs_handler(httpd_req_t *req)
+static esp_err_t logs_handler(httpd_req_t *in_req)
 {
+    httpd_req_t *req;
+    esp_err_t ret = httpd_req_async_handler_begin(in_req, &req);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "logs_handler: httpd_req_async_handler_begin failed with code: %d[%s]", ret,
+                 esp_err_to_name(ret));
+        return ret;
+    }
+
     httpd_resp_set_type(req, "text/event-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
     httpd_resp_set_hdr(req, "Connection", "keep-alive");
 
-    int sockfd = httpd_req_to_sockfd(req);
-    assert(sockfd >= 0);
-    esp_err_t ret = logger_add_socket(sockfd);
+    ret = httpd_resp_send_chunk(req, "data: connected\n\n", 17);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "logs_handler: httpd_resp_send_chunk failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        httpd_req_async_handler_complete(req);
+        return ret;
+    }
+
+    ret = logger_add_client(req);
     if (ret != ESP_OK)
     {
         ESP_LOGE(TAG, "logs_handler: logger_add_socket failed with code: %d[%s]", ret, esp_err_to_name(ret));
         if (ret == ESP_ERR_NO_MEM)
             httpd_resp_send_custom_err(req, "503", "Too many log connections");
+        httpd_req_async_handler_complete(req);
         return ESP_FAIL;
     }
 
     return ESP_OK;
 }
 
-static void global_close_handler(httpd_handle_t server, int sockfd)
+static esp_err_t logs_viewer_handler(httpd_req_t *in_req)
 {
-    ESP_LOGI(TAG, "global_close_handler: called for socket %d", sockfd);
+    extern const unsigned char index_html_start[] asm("_binary_index_html_start");
+    extern const unsigned char index_html_end[] asm("_binary_index_html_end");
 
-    // Try to remove from logger first (it might not be there)
-    esp_err_t ret = logger_remove_socket(sockfd);
-    if (ret != ESP_OK && ret != ESP_ERR_NOT_FOUND)
-    {
-        ESP_LOGE(TAG, "global_close_handler: logger_remove_socket failed with code: %d[%s]", ret, esp_err_to_name(ret));
-    }
-
-    // For /logs connections, use httpd_sess_trigger_close
-    ret = httpd_sess_trigger_close(server, sockfd) || close(sockfd);
+    esp_err_t ret = httpd_resp_send(in_req, (const char *)index_html_start, index_html_end - index_html_start);
     if (ret != ESP_OK)
     {
-        ESP_LOGE(TAG, "global_close_handler: httpd_sess_trigger_close failed with code: %d[%s]", ret,
-                 esp_err_to_name(ret));
+        ESP_LOGE(TAG, "logs_viewer_handler: httpd_resp_send failed with code: %d[%s]", ret, esp_err_to_name(ret));
+        return ESP_FAIL;
     }
+
+    return ESP_OK;
 }
 
 static httpd_handle_t start_webserver()
@@ -205,7 +233,6 @@ static httpd_handle_t start_webserver()
     httpd_ssl_config_t conf = HTTPD_SSL_CONFIG_DEFAULT();
     conf.httpd.uri_match_fn = httpd_uri_match_wildcard;
     conf.httpd.max_open_sockets = 5; // reduced to prevent system socket exhaustion
-    conf.httpd.close_fn = global_close_handler;
 
     extern const unsigned char cert_start[] asm("_binary_server_pem_start");
     extern const unsigned char cert_end[] asm("_binary_server_pem_end");
@@ -230,15 +257,23 @@ static httpd_handle_t start_webserver()
     }
 
     ESP_LOGI(TAG, "Registering URI handlers");
+
     static const httpd_uri_t ota_uri = {.uri = "/ota", .method = HTTP_POST, .handler = ota_update_handler};
     static const httpd_uri_t check_image_up_to_date_uri = {
         .uri = "/ota/check", .method = HTTP_GET, .handler = check_image_up_to_date_handler};
     static const httpd_uri_t sse = {.uri = "/logs", .method = HTTP_GET, .handler = logs_handler};
+    static const httpd_uri_t logs_viewer_uri = {
+        .uri = "/logs/viewer", .method = HTTP_GET, .handler = logs_viewer_handler};
+    static const httpd_uri_t favicon_uri = {.uri = "/favicon.ico", .method = HTTP_GET, .handler = favicon_handler};
     static const httpd_uri_t fallback_uri = {.uri = "/*", .method = HTTP_GET, .handler = fallback_handler};
+
     httpd_register_uri_handler(server, &ota_uri);
     httpd_register_uri_handler(server, &check_image_up_to_date_uri);
     httpd_register_uri_handler(server, &sse);
+    httpd_register_uri_handler(server, &logs_viewer_uri);
+    httpd_register_uri_handler(server, &favicon_uri);
     httpd_register_uri_handler(server, &fallback_uri);
+
     return server;
 }
 

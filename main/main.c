@@ -20,7 +20,7 @@ void app_main(void)
     server_init();
     hd44780_t *lcd = lcd_init();
     hd44780_clear(lcd);
-    
+
     // Start heap monitoring
     start_heap_monitor();
 }

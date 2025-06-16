@@ -15,4 +15,5 @@ idf_component_register(
   "certs/client.pem"
   "certs/server.pem"
   "certs/server.key"
-  "certs/ca.pem")
+  "certs/ca.pem"
+  "index.html")
