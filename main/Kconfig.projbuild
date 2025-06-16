@@ -73,13 +73,13 @@ menu "DWC Keeper Configuration"
     menu "Logger Configuration"
         config LOG_BUFFER_SIZE_BYTES
             int "Log Buffer Size (bytes)"
-            default 1024
+            default 16384
             help
                 Size of the ring buffer for storing log messages in bytes.
         
         config LOG_STACK_BUFFER_SIZE_BYTES
             int "Log Stack Buffer Size (bytes)"
-            default 1024
+            default 2048
             help
                 Size of the stack buffer for vprintf.
 

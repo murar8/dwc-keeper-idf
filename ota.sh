@@ -53,4 +53,6 @@ curl "${CURL_CERTS[@]}" https://${ESP_IP}/ota/check -H "sha256: $payload_sha256"
 echo
 
 echo
-echo "Update successful!"
+echo "Update successful, tailing logs..."
+# don't buffer the output
+curl "${CURL_CERTS[@]}" --fail -N https://${ESP_IP}/logs

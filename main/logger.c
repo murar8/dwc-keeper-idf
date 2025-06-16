@@ -38,7 +38,9 @@ static int logger_vprintf(const char *fmt, va_list args)
 
     vsnprintf(buffer, len + 1, fmt, args);
 
-    xRingbufferSend(log_buffer, buffer, len + 1, 0 /* no wait */);
+    int ret = xRingbufferSend(log_buffer, buffer, len + 1, portMAX_DELAY);
+    if (!ret)
+        printf("logger_vprintf: xRingbufferSend failed to send %d bytes\n", len + 1);
 
     if (buffer != stack_buffer)
         free(buffer);
