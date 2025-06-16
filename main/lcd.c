@@ -37,6 +37,7 @@ hd44780_t *lcd_init()
     ESP_ERROR_CHECK(hd44780_upload_character(&lcd, 0, BELL_CHAR));
     ESP_ERROR_CHECK(hd44780_upload_character(&lcd, 1, HOURGLASS_CHAR));
 
+    hd44780_clear(&lcd);
     hd44780_gotoxy(&lcd, 0, 0);
 
     return &lcd;

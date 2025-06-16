@@ -9,16 +9,12 @@ void print_heap_info(const char *label)
 {
     multi_heap_info_t heap_info;
     heap_caps_get_info(&heap_info, MALLOC_CAP_DEFAULT);
-
-    ESP_LOGI(TAG, "=== %s === Free: %lu/%lu (min %lu), Largest: %u, Blocks: %u (free: %u, alloc: %u)", 
-             label,
-             esp_get_free_heap_size(),
-             esp_get_free_heap_size() + heap_info.total_allocated_bytes,
-             esp_get_minimum_free_heap_size(),
-             heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT),
-             heap_info.total_blocks,
-             heap_info.free_blocks,
-             heap_info.allocated_blocks);
+    uint32_t total_allocated_kib = heap_info.total_allocated_bytes / 1024;
+    uint32_t total_kib = (heap_info.total_free_bytes + heap_info.total_allocated_bytes) / 1024;
+    uint32_t minimum_free_kib = heap_info.minimum_free_bytes / 1024;
+    uint32_t largest_free_kib = heap_info.largest_free_block / 1024;
+    ESP_LOGI(TAG, "Heap Usage: %luKiB/%luKiB (min %luKiB), Blocks: %u/%u (largest free %luKiB)", total_allocated_kib,
+             total_kib, minimum_free_kib, heap_info.allocated_blocks, heap_info.total_blocks, largest_free_kib);
 }
 
 static void heap_monitor_task(void *pvParameters)

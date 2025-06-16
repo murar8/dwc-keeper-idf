@@ -147,12 +147,20 @@ static esp_err_t check_image_up_to_date_handler(httpd_req_t *req)
     if (is_up_to_date)
     {
         ESP_LOGI(TAG, "check_image_up_to_date_handler: Image is up to date");
-        return httpd_resp_send(req, "Image is up to date", HTTPD_RESP_USE_STRLEN);
+        esp_err_t ret = httpd_resp_send(req, "Image is up to date", HTTPD_RESP_USE_STRLEN);
+        if (ret != ESP_OK)
+            ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_resp_send failed with code: %d[%s]", ret,
+                     esp_err_to_name(ret));
+        return ESP_FAIL;
     }
     else
     {
         ESP_LOGI(TAG, "check_image_up_to_date_handler: Image is not up to date");
-        return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Image is not up to date");
+        esp_err_t http_ret = httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Image is not up to date");
+        if (http_ret != ESP_OK)
+            ESP_LOGE(TAG, "check_image_up_to_date_handler: httpd_resp_send_err failed with code: %d[%s]", http_ret,
+                     esp_err_to_name(http_ret));
+        return ESP_FAIL;
     }
 }
 
@@ -166,7 +174,7 @@ static esp_err_t logs_handler(httpd_req_t *in_req)
     else
     {
         ESP_LOGE(TAG, "logs_handler: logger_add_socket failed with code: %d[%s]", ret, esp_err_to_name(ret));
-        return ret;
+        return ESP_FAIL;
     }
 }
 

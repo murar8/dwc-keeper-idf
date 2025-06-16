@@ -17,8 +17,12 @@ static RingbufHandle_t log_buffer;
 static httpd_req_t *clients[CONFIG_LOG_MAX_SOCKETS] = {NULL};
 static SemaphoreHandle_t client_semaphores[CONFIG_LOG_MAX_SOCKETS];
 
+static int vprintf_failed_allocations = 0;
+static int vprintf_failed_sends = 0;
+
 static int logger_vprintf(const char *fmt, va_list args)
 {
+
     va_list args_copy;
     va_copy(args_copy, args);
     int len = vprintf(fmt, args_copy);
@@ -33,14 +37,16 @@ static int logger_vprintf(const char *fmt, va_list args)
     {
         buffer = malloc(len + 1);
         if (!buffer)
+        {
+            vprintf_failed_allocations++;
             return len;
+        }
     }
 
     vsnprintf(buffer, len + 1, fmt, args);
-
-    int ret = xRingbufferSend(log_buffer, buffer, len + 1, portMAX_DELAY);
+    int ret = xRingbufferSend(log_buffer, buffer, len + 1, 0 /* no wait */);
     if (!ret)
-        printf("logger_vprintf: xRingbufferSend failed to send %d bytes\n", len + 1);
+        vprintf_failed_sends++;
 
     if (buffer != stack_buffer)
         free(buffer);
@@ -188,6 +194,24 @@ static void send_logs_to_clients_task(void *arg)
     }
 }
 
+static void print_vprintf_stats_task(void *arg)
+{
+    while (1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(30000));
+        if (vprintf_failed_allocations > 0)
+        {
+            vprintf_failed_allocations = 0;
+            ESP_LOGE(TAG, "print_vprintf_stats_task: Failed to allocate %d times", vprintf_failed_allocations);
+        }
+        if (vprintf_failed_sends > 0)
+        {
+            vprintf_failed_sends = 0;
+            ESP_LOGE(TAG, "print_vprintf_stats_task: Failed to send %d times", vprintf_failed_sends);
+        }
+    }
+}
+
 void logger_init(void)
 {
     esp_log_level_set(TAG, ESP_LOG_DEBUG);
@@ -197,5 +221,7 @@ void logger_init(void)
     log_buffer = xRingbufferCreate(CONFIG_LOG_BUFFER_SIZE_BYTES, RINGBUF_TYPE_BYTEBUF);
     esp_log_set_vprintf(logger_vprintf);
     xTaskCreate(send_logs_to_clients_task, "send_logs_to_clients_task", CONFIG_LOG_SEND_TASK_STACK_SIZE, NULL,
+                CONFIG_LOG_SEND_TASK_PRIORITY, NULL);
+    xTaskCreate(print_vprintf_stats_task, "print_vprintf_stats_task", CONFIG_ESP32_PTHREAD_STACK_MIN, NULL,
                 CONFIG_LOG_SEND_TASK_PRIORITY, NULL);
 }
