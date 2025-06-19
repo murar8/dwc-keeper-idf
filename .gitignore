@@ -10,3 +10,4 @@ sdkconfig.old
 
 .cache/
 build/
+managed_components/

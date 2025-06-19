@@ -1,0 +1,37 @@
+dependencies:
+  UncleRus/esp_idf_lib_helpers:
+    component_hash: 798b1a6294af807374e9de099905af9a9b779a27068437c2912a7232b87dc6ac
+    dependencies: []
+    source:
+      git: https://github.com/UncleRus/esp-idf-lib.git
+      path: components/esp_idf_lib_helpers/
+      type: git
+    version: a02cd6bb5190cab379125140780adcb8d88f9650
+  UncleRus/hd44780:
+    component_hash: 3444115f226855c65546d93fd24cf86ad7f4e8158a81bfc0a238a7ced06d77d7
+    dependencies: []
+    source:
+      git: https://github.com/UncleRus/esp-idf-lib.git
+      path: components/hd44780/
+      type: git
+    version: a02cd6bb5190cab379125140780adcb8d88f9650
+  esp32-encoder:
+    component_hash: 0b63779ee517789036e9368543bde3cdd1e68867911a0666ad106313efcf1462
+    dependencies: []
+    source:
+      git: https://github.com/madhephaestus/ESP32Encoder.git
+      path: .
+      type: git
+    version: 712a0ff68e6de765bf03728946749b0f0e5636d2
+  idf:
+    source:
+      type: idf
+    version: 5.4.1
+direct_dependencies:
+- UncleRus/esp_idf_lib_helpers
+- UncleRus/hd44780
+- esp32-encoder
+- idf
+manifest_hash: b893ba48a6d8a16ddd5cd9c9dce7aaf6f250cc110b5a70441e17a69e28712cff
+target: esp32
+version: 2.0.0

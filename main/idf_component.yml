@@ -1,0 +1,15 @@
+dependencies:
+  ## Required IDF version
+  idf:
+    version: ">=4.1.0"
+
+  UncleRus/esp_idf_lib_helpers:
+    path: components/esp_idf_lib_helpers/
+    git: https://github.com/UncleRus/esp-idf-lib.git
+
+  UncleRus/hd44780:
+    path: components/hd44780/
+    git: https://github.com/UncleRus/esp-idf-lib.git
+
+  esp32-encoder:
+    git: https://github.com/madhephaestus/ESP32Encoder.git
