@@ -15,14 +15,6 @@ dependencies:
       path: components/hd44780/
       type: git
     version: a02cd6bb5190cab379125140780adcb8d88f9650
-  esp32-encoder:
-    component_hash: 0b63779ee517789036e9368543bde3cdd1e68867911a0666ad106313efcf1462
-    dependencies: []
-    source:
-      git: https://github.com/madhephaestus/ESP32Encoder.git
-      path: .
-      type: git
-    version: 712a0ff68e6de765bf03728946749b0f0e5636d2
   idf:
     source:
       type: idf
@@ -30,8 +22,7 @@ dependencies:
 direct_dependencies:
 - UncleRus/esp_idf_lib_helpers
 - UncleRus/hd44780
-- esp32-encoder
 - idf
-manifest_hash: b893ba48a6d8a16ddd5cd9c9dce7aaf6f250cc110b5a70441e17a69e28712cff
+manifest_hash: 80a4279db90238f33d18570576558dd5b8d35ddace8e4d98434c75765cb688ff
 target: esp32
 version: 2.0.0

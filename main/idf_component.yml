@@ -10,6 +10,3 @@ dependencies:
   UncleRus/hd44780:
     path: components/hd44780/
     git: https://github.com/UncleRus/esp-idf-lib.git
-
-  esp32-encoder:
-    git: https://github.com/madhephaestus/ESP32Encoder.git

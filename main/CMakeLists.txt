@@ -5,6 +5,8 @@ idf_component_register(
   "wifi.c"
   "main.c"
   "lcd.c"
+  "encoder.c"
+  "button.c"
   "input.c"
   "ota.c"
   "ota_logger.c"

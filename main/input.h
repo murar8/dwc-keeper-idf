@@ -1,12 +1,16 @@
 #pragma once
 
-#include <driver/gpio.h>
-#include <encoder.h>
+#include <esp_event.h>
+#include <freertos/queue.h>
 
-#define ENCODER_SW_PIN GPIO_NUM_34
-#define ENCODER_DT_PIN GPIO_NUM_39
-#define ENCODER_CLK_PIN GPIO_NUM_36
+typedef enum
+{
+    INPUT_EVENT_TYPE_BUTTON_PRESS,
+    INPUT_EVENT_TYPE_BUTTON_RELEASE,
+    INPUT_EVENT_TYPE_ROTATE_CW,
+    INPUT_EVENT_TYPE_ROTATE_CCW,
+} input_event_type_t;
 
-void input_init(void);
+ESP_EVENT_DECLARE_BASE(INPUT_EVENT);
 
-bool input_receive_event(rotary_encoder_event_t *event, TickType_t timeout);
+QueueHandle_t input_init(void);
