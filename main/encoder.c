@@ -3,7 +3,7 @@
 
 #include <driver/gpio.h>
 #include <driver/pulse_cnt.h>
-#include <driver/timer.h>
+#include <esp_err.h>
 #include <esp_log.h>
 #include <esp_sleep.h>
 #include <freertos/FreeRTOS.h>
@@ -11,16 +11,25 @@
 #include <freertos/task.h>
 #include <sdkconfig.h>
 
-static bool on_pcnt_reach_encoder(pcnt_unit_handle_t unit, const pcnt_watch_event_data_t *edata, void *user_ctx)
+static const char *TAG = "encoder";
+
+static bool on_pcnt_reach(pcnt_unit_handle_t unit, const pcnt_watch_event_data_t *edata, void *user_ctx)
 {
-    BaseType_t high_task_wakeup;
-    QueueHandle_t queue = (QueueHandle_t)user_ctx;
     input_event_type_t event;
     if (edata->watch_point_value == CONFIG_INPUT_ENCODER_STEP_SIZE)
         event = INPUT_EVENT_TYPE_ROTATE_CW;
     else if (edata->watch_point_value == -CONFIG_INPUT_ENCODER_STEP_SIZE)
         event = INPUT_EVENT_TYPE_ROTATE_CCW;
+    else
+    {
+        ESP_DRAM_LOGE(TAG, "on_pcnt_reach: invalid watch point value: %d", edata->watch_point_value);
+        abort();
+    }
+
+    BaseType_t high_task_wakeup;
+    QueueHandle_t queue = (QueueHandle_t)user_ctx;
     xQueueSendFromISR(queue, &event, &high_task_wakeup);
+
     return (high_task_wakeup == pdTRUE);
 }
 
@@ -41,11 +50,10 @@ void encoder_init(QueueHandle_t queue)
 
     ESP_ERROR_CHECK(
         pcnt_channel_set_edge_action(channel, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE));
-
     ESP_ERROR_CHECK(
         pcnt_channel_set_level_action(channel, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE));
 
-    pcnt_event_callbacks_t cbs = {.on_reach = on_pcnt_reach_encoder};
+    pcnt_event_callbacks_t cbs = {.on_reach = on_pcnt_reach};
     ESP_ERROR_CHECK(pcnt_unit_register_event_callbacks(unit, &cbs, queue));
 
     ESP_ERROR_CHECK(pcnt_unit_add_watch_point(unit, CONFIG_INPUT_ENCODER_STEP_SIZE));
