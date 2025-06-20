@@ -38,23 +38,25 @@ void app_main(void)
             switch (event)
             {
             case INPUT_EVENT_TYPE_BUTTON_PRESS:
+                ESP_LOGI(TAG, "Button pressed");
                 count = 0;
                 break;
             case INPUT_EVENT_TYPE_BUTTON_RELEASE:
                 ESP_LOGI(TAG, "Button released");
                 break;
             case INPUT_EVENT_TYPE_ROTATE_CW:
+                ESP_LOGI(TAG, "Rotate CW");
                 count++;
                 break;
             case INPUT_EVENT_TYPE_ROTATE_CCW:
+                ESP_LOGI(TAG, "Rotate CCW");
                 count--;
                 break;
             }
             hd44780_clear(lcd);
             hd44780_gotoxy(lcd, 0, 0);
-            hd44780_puts(lcd, "Button: ");
-            hd44780_gotoxy(lcd, 0, 1);
             hd44780_puts(lcd, "Count: ");
+            hd44780_gotoxy(lcd, 0, 1);
             char buffer[16];
             sprintf(buffer, "%d", count);
             hd44780_puts(lcd, buffer);

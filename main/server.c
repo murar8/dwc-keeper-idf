@@ -174,7 +174,7 @@ static httpd_handle_t start_webserver()
 
     httpd_ssl_config_t conf = HTTPD_SSL_CONFIG_DEFAULT();
     conf.httpd.uri_match_fn = httpd_uri_match_wildcard;
-    conf.httpd.max_open_sockets = 5; // reduced to prevent system socket exhaustion
+    conf.httpd.max_open_sockets = CONFIG_HTTP_MAX_OPEN_SOCKETS;
 
     extern const unsigned char cert_start[] asm("_binary_server_pem_start");
     extern const unsigned char cert_end[] asm("_binary_server_pem_end");

@@ -8,13 +8,13 @@ static hd44780_t lcd = {
     .lines = LCD_LINES,
     .pins =
         {
-            .rs = LCD_RS_PIN,
-            .e = LCD_E_PIN,
-            .d4 = LCD_D4_PIN,
-            .d5 = LCD_D5_PIN,
-            .d6 = LCD_D6_PIN,
-            .d7 = LCD_D7_PIN,
-            .bl = LCD_BL_PIN,
+            .rs = CONFIG_LCD_RS_PIN,
+            .e = CONFIG_LCD_E_PIN,
+            .d4 = CONFIG_LCD_D4_PIN,
+            .d5 = CONFIG_LCD_D5_PIN,
+            .d6 = CONFIG_LCD_D6_PIN,
+            .d7 = CONFIG_LCD_D7_PIN,
+            .bl = HD44780_NOT_USED,
         },
 };
 
@@ -28,9 +28,9 @@ static const uint8_t HOURGLASS_CHAR[] = {
 hd44780_t *lcd_init()
 {
     // Tie RW pin low -- write only
-    ESP_ERROR_CHECK(gpio_reset_pin(LCD_RW_PIN));
-    ESP_ERROR_CHECK(gpio_set_direction(LCD_RW_PIN, GPIO_MODE_OUTPUT));
-    ESP_ERROR_CHECK(gpio_set_level(LCD_RW_PIN, 0));
+    ESP_ERROR_CHECK(gpio_reset_pin(CONFIG_LCD_RW_PIN));
+    ESP_ERROR_CHECK(gpio_set_direction(CONFIG_LCD_RW_PIN, GPIO_MODE_OUTPUT));
+    ESP_ERROR_CHECK(gpio_set_level(CONFIG_LCD_RW_PIN, 0));
 
     ESP_ERROR_CHECK(hd44780_init(&lcd));
 

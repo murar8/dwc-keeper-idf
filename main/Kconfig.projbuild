@@ -68,6 +68,12 @@ menu "DWC Keeper Configuration"
             default "https://192.168.1.150:8080/dwc_keeper.bin"
             help
                 URL to the OTA payload.
+
+        config OTA_RESTART_DELAY_MS
+            int "OTA Restart Delay (ms)"
+            default 1000
+            help
+                Delay in milliseconds before restarting after successful OTA update.
     endmenu
 
     menu "Logger Configuration"
@@ -126,6 +132,12 @@ menu "DWC Keeper Configuration"
             default 5
             help
                 Maximum number of async HTTP requests that can be handled simultaneously.
+
+        config HTTP_MAX_OPEN_SOCKETS
+            int "Maximum Open HTTP Sockets"
+            default 5
+            help
+                Maximum number of HTTP sockets that can be open simultaneously.
     endmenu
 
     menu "Heap Monitor Configuration"
@@ -146,6 +158,108 @@ menu "DWC Keeper Configuration"
             default 0
             help
                 Priority for the heap monitor task.
+    endmenu
+
+    menu "Input Configuration"
+        config INPUT_BUTTON_GPIO_NUM
+            int "Button GPIO Number"
+            default 34
+            help
+                GPIO pin number for the input button.
+
+        config INPUT_BUTTON_DEBOUNCE_MS
+            int "Button Debounce Time (ms)"
+            default 50
+            help
+                Button debounce time in milliseconds.
+
+        config INPUT_ENCODER_GLITCH_FILTER_MAX_NS
+            int "Encoder Glitch Filter Maximum (ns)"
+            default 1000
+            help
+                Maximum nanoseconds for encoder glitch filter.
+
+        config INPUT_ENCODER_STEP_SIZE
+            int "Encoder Step Size"
+            default 2
+            help
+                Step size for encoder rotation detection.
+
+        config INPUT_ENCODER_CLK_GPIO_NUM
+            int "Encoder Clock GPIO Number"
+            default 36
+            help
+                GPIO pin number for encoder clock signal.
+
+        config INPUT_ENCODER_DATA_GPIO_NUM
+            int "Encoder Data GPIO Number"
+            default 39
+            help
+                GPIO pin number for encoder data signal.
+
+        config INPUT_PCNT_QUEUE_SIZE
+            int "Pulse Counter Queue Size"
+            default 10
+            help
+                Size of the pulse counter event queue.
+    endmenu
+
+    menu "LCD Configuration"
+        config LCD_LINES
+            int "LCD Lines"
+            default 2
+            help
+                Number of lines on the LCD display.
+
+        config LCD_RS_PIN
+            int "LCD RS Pin"
+            default 27
+            help
+                GPIO pin number for LCD RS (Register Select) signal.
+
+        config LCD_RW_PIN
+            int "LCD RW Pin"
+            default 26
+            help
+                GPIO pin number for LCD RW (Read/Write) signal.
+
+        config LCD_E_PIN
+            int "LCD Enable Pin"
+            default 25
+            help
+                GPIO pin number for LCD Enable signal.
+
+        config LCD_D4_PIN
+            int "LCD D4 Pin"
+            default 33
+            help
+                GPIO pin number for LCD D4 data line.
+
+        config LCD_D5_PIN
+            int "LCD D5 Pin"
+            default 32
+            help
+                GPIO pin number for LCD D5 data line.
+
+        config LCD_D6_PIN
+            int "LCD D6 Pin"
+            default 13
+            help
+                GPIO pin number for LCD D6 data line.
+
+        config LCD_D7_PIN
+            int "LCD D7 Pin"
+            default 14
+            help
+                GPIO pin number for LCD D7 data line.
+    endmenu
+
+    menu "Timer Configuration"
+        config TIMER_RESOLUTION_HZ
+            int "Timer Resolution (Hz)"
+            default 1000000
+            help
+                Timer resolution in Hz for button debounce timer.
     endmenu
 
 endmenu

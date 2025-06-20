@@ -45,12 +45,12 @@ static bool on_timer_alarm(gptimer_handle_t timer, const gptimer_alarm_event_dat
 void button_init(QueueHandle_t queue)
 {
     gptimer_config_t config = {
-        .clk_src = GPTIMER_CLK_SRC_DEFAULT, .direction = GPTIMER_COUNT_UP, .resolution_hz = 1000000};
+        .clk_src = GPTIMER_CLK_SRC_DEFAULT, .direction = GPTIMER_COUNT_UP, .resolution_hz = CONFIG_TIMER_RESOLUTION_HZ};
     ESP_ERROR_CHECK(gptimer_new_timer(&config, &timer));
     gptimer_event_callbacks_t cbs = {.on_alarm = on_timer_alarm};
     ESP_ERROR_CHECK(gptimer_register_event_callbacks(timer, &cbs, queue));
-    gptimer_alarm_config_t alarm_config = {
-        .alarm_count = CONFIG_INPUT_BUTTON_DEBOUNCE_MS * 1000, .reload_count = 0, .flags = {.auto_reload_on_alarm = 0}};
+    uint64_t alarm_count = CONFIG_INPUT_BUTTON_DEBOUNCE_MS * (CONFIG_TIMER_RESOLUTION_HZ / 1000);
+    gptimer_alarm_config_t alarm_config = {.alarm_count = alarm_count, .reload_count = 0};
     ESP_ERROR_CHECK(gptimer_set_alarm_action(timer, &alarm_config));
     ESP_ERROR_CHECK(gptimer_enable(timer));
 

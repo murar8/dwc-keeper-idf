@@ -1,5 +1,6 @@
 #include "ota.h"
 #include "ota_logger.h"
+#include "sha_util.h"
 
 #include <esp_https_ota.h>
 #include <esp_log.h>
@@ -8,8 +9,6 @@
 #include <freertos/portmacro.h>
 
 #define ERR_ALREADY_UPDATED 0xC001C0D1
-
-#define SHA256_CHAR_LENGTH 32
 
 static const char *TAG = "ota";
 
@@ -29,7 +28,7 @@ static esp_https_ota_config_t ota_config = {
 static bool s_ota_running = false;
 static portMUX_TYPE s_ota_mux = portMUX_INITIALIZER_UNLOCKED;
 
-static esp_err_t get_current_sha256(char sha256[32])
+static esp_err_t get_current_sha256(char sha256[SHA256_LENGTH_BYTES])
 {
     esp_app_desc_t running_app;
     esp_err_t ret = esp_ota_get_partition_description(esp_ota_get_running_partition(), &running_app);
@@ -112,7 +111,7 @@ static void ota_task(void *pvParameters)
     if (ret == ESP_OK)
     {
         ESP_LOGI(TAG, "ota_task: ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(CONFIG_OTA_RESTART_DELAY_MS));
         esp_restart();
     }
     else if (ret == ERR_ALREADY_UPDATED)
@@ -139,13 +138,13 @@ static void ota_task(void *pvParameters)
     }
 }
 
-esp_err_t ota_is_image_up_to_date(uint8_t sha256[32], bool *is_up_to_date)
+esp_err_t ota_is_image_up_to_date(uint8_t sha256[SHA256_LENGTH_BYTES], bool *is_up_to_date)
 {
-    char current_sha256[SHA256_CHAR_LENGTH];
+    char current_sha256[SHA256_LENGTH_BYTES];
     esp_err_t ret = get_current_sha256(current_sha256);
     if (ret == ESP_OK)
     {
-        *is_up_to_date = memcmp(sha256, current_sha256, SHA256_CHAR_LENGTH) == 0;
+        *is_up_to_date = memcmp(sha256, current_sha256, SHA256_LENGTH_BYTES) == 0;
         return ESP_OK;
     }
     else
@@ -168,7 +167,6 @@ void ota_run(void)
     {
         portEXIT_CRITICAL(&s_ota_mux);
         ESP_LOGE(TAG, "ota_run: OTA is already running");
-        return;
     }
     else
     {
