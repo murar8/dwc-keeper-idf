@@ -13,6 +13,8 @@ idf_component_register(
   "storage.c"
   "logger.c"
   "sha_util.c"
+  "pumps.c"
+  "sensors.c"
   INCLUDE_DIRS
   "."
   EMBED_TXTFILES

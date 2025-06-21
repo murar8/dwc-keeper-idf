@@ -9,8 +9,6 @@
 
 ESP_EVENT_DEFINE_BASE(INPUT_EVENT);
 
-static const char *TAG = "button";
-
 static gptimer_handle_t timer = NULL;
 static int last_button_level = 1;
 static int current_button_level = 1;
