@@ -3,6 +3,7 @@
 #include "lcd.h"
 #include "logger.h"
 #include "pumps.h"
+#include "sensors.h"
 #include "server.h"
 #include "storage.h"
 #include "wifi.h"
@@ -33,6 +34,7 @@ void app_main(void)
 
     pumps_init();
     floats_init();
+    sensors_init();
 
     nvs_init();
     server_init();

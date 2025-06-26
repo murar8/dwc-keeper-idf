@@ -7,7 +7,6 @@
 #include <hal/gpio_types.h>
 #include <hd44780.h>
 #include <soc/adc_channel.h>
-#include <stdio.h>
 
 #define PUMPS_FREQUENCY 25000
 #define PUMPS_TIMER LEDC_TIMER_0
