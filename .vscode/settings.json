@@ -1,4 +1,6 @@
 {
+  "idf.port": "/dev/ttyUSB0",
+  "idf.flashType": "UART",
   "cmake.cmakePath": "${workspaceFolder}/cmake-wrapper.sh",
   "cmake.configureOnOpen": false,
   "cmakeFormat.exePath": "/home/lmurarotto/.espressif/python_env/idf5.4_py3.12_env/bin/cmake-format",

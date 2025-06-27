@@ -7,7 +7,7 @@
 #include <soc/adc_channel.h>
 #include <soc/soc_caps.h>
 
-#define CONFIG_SENSOR_BUF_SIZE 32
+#define CONFIG_SENSOR_BUF_SIZE (1024 * 4)
 
 #define SENSOR_EC_ADC_ATTEN ADC_ATTEN_DB_12
 #define SENSOR_PH_ADC_ATTEN ADC_ATTEN_DB_12
@@ -61,7 +61,7 @@ static inline size_t buffer_length(size_t sensor_idx)
            CONFIG_SENSOR_BUF_SIZE;
 }
 
-static inline void buffer_put(size_t sensor_idx, uint16_t item)
+static void buffer_put(size_t sensor_idx, uint16_t item)
 {
     assert(sensor_idx < SENSOR_COUNT);
     buffers[sensor_idx][buffer_end_indexes[sensor_idx]] = item;
@@ -70,7 +70,7 @@ static inline void buffer_put(size_t sensor_idx, uint16_t item)
         buffer_start_indexes[sensor_idx] = (buffer_start_indexes[sensor_idx] + 1) % CONFIG_SENSOR_BUF_SIZE;
 }
 
-static inline uint16_t buffer_get(size_t sensor_idx, size_t offset)
+static uint16_t buffer_get(size_t sensor_idx, size_t offset)
 {
     assert(sensor_idx < SENSOR_COUNT);
     size_t length = buffer_length(sensor_idx);
