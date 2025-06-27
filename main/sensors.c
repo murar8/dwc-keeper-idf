@@ -7,7 +7,7 @@
 #include <soc/adc_channel.h>
 #include <soc/soc_caps.h>
 
-#define CONFIG_SENSOR_BUF_SIZE 8
+#define CONFIG_SENSOR_BUF_SIZE 32
 
 #define SENSOR_EC_ADC_ATTEN ADC_ATTEN_DB_12
 #define SENSOR_PH_ADC_ATTEN ADC_ATTEN_DB_12
@@ -61,19 +61,20 @@ static inline size_t buffer_length(size_t sensor_idx)
            CONFIG_SENSOR_BUF_SIZE;
 }
 
-static void buffer_put(size_t sensor_idx, uint16_t item)
+static inline void buffer_put(size_t sensor_idx, uint16_t item)
 {
+    assert(sensor_idx < SENSOR_COUNT);
     buffers[sensor_idx][buffer_end_indexes[sensor_idx]] = item;
     buffer_end_indexes[sensor_idx] = (buffer_end_indexes[sensor_idx] + 1) % CONFIG_SENSOR_BUF_SIZE;
     if (buffer_end_indexes[sensor_idx] == buffer_start_indexes[sensor_idx])
         buffer_start_indexes[sensor_idx] = (buffer_start_indexes[sensor_idx] + 1) % CONFIG_SENSOR_BUF_SIZE;
 }
 
-static uint16_t buffer_get(size_t sensor_idx, size_t offset)
+static inline uint16_t buffer_get(size_t sensor_idx, size_t offset)
 {
+    assert(sensor_idx < SENSOR_COUNT);
     size_t length = buffer_length(sensor_idx);
-    if (length == 0 || offset >= length)
-        return 0;
+    assert(offset < length);
     size_t idx = (buffer_start_indexes[sensor_idx] + offset) % length;
     return buffers[sensor_idx][idx];
 }
@@ -92,15 +93,12 @@ static ssize_t sensor_get_idx(sensor_adc_channel_t channel)
 int16_t sensor_get_value(sensor_adc_channel_t channel)
 {
     ssize_t sensor_idx = sensor_get_idx(channel);
-    if (sensor_idx == -1)
-        return -1;
-    uint32_t sum = 0;
+    assert(sensor_idx != -1);
     size_t length = buffer_length(sensor_idx);
+    uint64_t sum = 0;
     for (size_t i = 0; i < length; i++)
-    {
-        sum += buffer_get(sensor_idx, i);
-    }
-    return (int16_t)(sum / length);
+        sum += buffer_get(sensor_idx, i) * (i + 1);
+    return (int16_t)(sum / (length * (length + 1) / 2));
 }
 
 static bool on_adc_continuous_data_ready(adc_continuous_handle_t handle, const adc_continuous_evt_data_t *edata,
