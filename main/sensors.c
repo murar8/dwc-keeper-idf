@@ -51,34 +51,11 @@ static const sensor_config_t sensor_configs[] = {
 
 static const char *TAG = "sensors";
 
+static portMUX_TYPE buffer_muxes[SENSOR_COUNT] = {[0 ... SENSOR_COUNT - 1] = portMUX_INITIALIZER_UNLOCKED};
 static size_t buffer_start_indexes[SENSOR_COUNT] = {[0 ... SENSOR_COUNT - 1] = 0};
 static size_t buffer_end_indexes[SENSOR_COUNT] = {[0 ... SENSOR_COUNT - 1] = 0};
 static uint16_t buffers[SENSOR_COUNT][CONFIG_SENSOR_BUF_SIZE] = {
     [0 ... SENSOR_COUNT - 1] = {[0 ... CONFIG_SENSOR_BUF_SIZE - 1] = 0}};
-
-static inline size_t buffer_length(size_t sensor_idx)
-{
-    return (buffer_end_indexes[sensor_idx] - buffer_start_indexes[sensor_idx] + CONFIG_SENSOR_BUF_SIZE) %
-           CONFIG_SENSOR_BUF_SIZE;
-}
-
-static void buffer_put(size_t sensor_idx, uint16_t item)
-{
-    assert(sensor_idx < SENSOR_COUNT);
-    buffers[sensor_idx][buffer_end_indexes[sensor_idx]] = item;
-    buffer_end_indexes[sensor_idx] = (buffer_end_indexes[sensor_idx] + 1) % CONFIG_SENSOR_BUF_SIZE;
-    if (buffer_end_indexes[sensor_idx] == buffer_start_indexes[sensor_idx])
-        buffer_start_indexes[sensor_idx] = (buffer_start_indexes[sensor_idx] + 1) % CONFIG_SENSOR_BUF_SIZE;
-}
-
-static uint16_t buffer_get(size_t sensor_idx, size_t offset)
-{
-    assert(sensor_idx < SENSOR_COUNT);
-    size_t length = buffer_length(sensor_idx);
-    assert(offset < length);
-    size_t idx = (buffer_start_indexes[sensor_idx] + offset) % length;
-    return buffers[sensor_idx][idx];
-}
 
 static ssize_t sensor_get_idx(sensor_adc_channel_t channel)
 {
@@ -91,14 +68,42 @@ static ssize_t sensor_get_idx(sensor_adc_channel_t channel)
     }
 }
 
+static inline size_t buffer_length(size_t sensor_idx)
+{
+    return (buffer_end_indexes[sensor_idx] - buffer_start_indexes[sensor_idx] + CONFIG_SENSOR_BUF_SIZE) %
+           CONFIG_SENSOR_BUF_SIZE;
+}
+
+static void buffer_put(size_t sensor_idx, uint16_t item)
+{
+    assert(sensor_idx < SENSOR_COUNT);
+    portENTER_CRITICAL(&buffer_muxes[sensor_idx]);
+    buffers[sensor_idx][buffer_end_indexes[sensor_idx]] = item;
+    buffer_end_indexes[sensor_idx] = (buffer_end_indexes[sensor_idx] + 1) % CONFIG_SENSOR_BUF_SIZE;
+    if (buffer_end_indexes[sensor_idx] == buffer_start_indexes[sensor_idx])
+        buffer_start_indexes[sensor_idx] = (buffer_start_indexes[sensor_idx] + 1) % CONFIG_SENSOR_BUF_SIZE;
+    portEXIT_CRITICAL(&buffer_muxes[sensor_idx]);
+}
+
+static uint16_t buffer_get(size_t sensor_idx, size_t offset)
+{
+    assert(sensor_idx < SENSOR_COUNT);
+    size_t length = buffer_length(sensor_idx);
+    assert(offset < length);
+    size_t idx = (buffer_start_indexes[sensor_idx] + offset) % length;
+    return buffers[sensor_idx][idx];
+}
+
 int16_t sensor_get_value(sensor_adc_channel_t channel)
 {
     ssize_t sensor_idx = sensor_get_idx(channel);
     assert(sensor_idx != -1);
+    portENTER_CRITICAL(&buffer_muxes[sensor_idx]);
     size_t length = buffer_length(sensor_idx);
     uint64_t sum = 0;
     for (size_t i = 0; i < length; i++)
         sum += buffer_get(sensor_idx, i) * (i + 1);
+    portEXIT_CRITICAL(&buffer_muxes[sensor_idx]);
     return (int16_t)(sum / (length * (length + 1) / 2));
 }
 

@@ -1,4 +1,3 @@
-#include "heap_debug.h"
 #include "input.h"
 #include "lcd.h"
 #include "logger.h"
@@ -42,8 +41,6 @@ void app_main(void)
     logger_init();
     QueueHandle_t input_queue = input_init();
     hd44780_t *lcd = lcd_init();
-
-    start_heap_monitor();
 
     pump_gpio_num_t pump_gpio_num = PUMP_A_GPIO_NUM;
     while (true)
