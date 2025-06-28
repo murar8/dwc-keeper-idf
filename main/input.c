@@ -4,7 +4,6 @@
 
 #include <driver/gpio.h>
 #include <driver/pulse_cnt.h>
-#include <driver/timer.h>
 #include <esp_log.h>
 #include <esp_sleep.h>
 #include <freertos/FreeRTOS.h>

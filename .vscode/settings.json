@@ -1,11 +1,16 @@
 {
   "idf.port": "/dev/ttyUSB0",
   "idf.flashType": "UART",
+  "idf.espIdfPath": "/home/lmurarotto/.esp-idf/v5.4.1/esp-idf",
+  "files.associations": { "*.h": "c" },
   "cmake.cmakePath": "${workspaceFolder}/cmake-wrapper.sh",
   "cmake.configureOnOpen": false,
   "cmakeFormat.exePath": "/home/lmurarotto/.espressif/python_env/idf5.4_py3.12_env/bin/cmake-format",
   "python.defaultInterpreterPath": "/home/lmurarotto/.espressif/python_env/idf5.4_py3.12_env/bin/python",
-  "files.associations": {
-    "*.h": "c"
-  }
+  "clangd.path": "/home/lmurarotto/.espressif/tools/esp-clang/esp-18.1.2_20240912/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=/home/lmurarotto/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32-elf-gcc",
+    "--compile-commands-dir=/home/lmurarotto/Documents/Personal/dwc-keeper-idf/build"
+  ]
 }

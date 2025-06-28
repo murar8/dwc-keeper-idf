@@ -1,5 +1,4 @@
 CompileFlags:
   CompilationDatabase: build
-  Add: [-isysroot=/home/lmurarotto/.espressif/tools/tensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf]
   Remove: [-fno-tree-switch-conversion, -mtext-section-literals, -mlong-calls, -fstrict-volatile-bitfields, -fno-shrink-wrap]
 

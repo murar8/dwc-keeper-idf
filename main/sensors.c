@@ -4,10 +4,11 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/ringbuf.h>
+#include <hal/dma_types.h>
 #include <soc/adc_channel.h>
 #include <soc/soc_caps.h>
 
-#define CONFIG_SENSOR_BUF_SIZE (1024 * 4)
+#define CONFIG_SENSOR_BUF_SIZE (1024 * 4) // 4096 samples / 2 samples/s = 2048s = 34min
 
 #define SENSOR_EC_ADC_ATTEN ADC_ATTEN_DB_12
 #define SENSOR_PH_ADC_ATTEN ADC_ATTEN_DB_12
@@ -19,7 +20,7 @@
 #define SENSOR_ADC_SAMPLE_FREQ_HZ SOC_ADC_SAMPLE_FREQ_THRES_LOW
 #define SENSOR_ADC_FORMAT ADC_DIGI_OUTPUT_FORMAT_TYPE1
 
-#define SENSOR_ADC_SAMPLES_PER_FRAME 4096
+#define SENSOR_ADC_SAMPLES_PER_FRAME DMA_DESCRIPTOR_BUFFER_MAX_SIZE
 #define SENSOR_ADC_CONV_FRAME_SIZE (SOC_ADC_DIGI_DATA_BYTES_PER_CONV * SENSOR_ADC_SAMPLES_PER_FRAME)
 #define SENSOR_ADC_MAX_STORE_BUF_SIZE (SENSOR_ADC_CONV_FRAME_SIZE)
 
