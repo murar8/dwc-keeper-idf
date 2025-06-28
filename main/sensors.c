@@ -90,20 +90,23 @@ static uint16_t buffer_get(size_t sensor_idx, size_t offset)
     assert(sensor_idx < SENSOR_COUNT);
     size_t length = buffer_length(sensor_idx);
     assert(offset < length);
+    portENTER_CRITICAL(&buffer_muxes[sensor_idx]);
     size_t idx = (buffer_start_indexes[sensor_idx] + offset) % length;
-    return buffers[sensor_idx][idx];
+    uint16_t value = buffers[sensor_idx][idx];
+    portEXIT_CRITICAL(&buffer_muxes[sensor_idx]);
+    return value;
 }
 
 int16_t sensor_get_value(sensor_adc_channel_t channel)
 {
     ssize_t sensor_idx = sensor_get_idx(channel);
     assert(sensor_idx != -1);
-    portENTER_CRITICAL(&buffer_muxes[sensor_idx]);
     size_t length = buffer_length(sensor_idx);
+    if (length == 0)
+        return 0;
     uint64_t sum = 0;
     for (size_t i = 0; i < length; i++)
         sum += buffer_get(sensor_idx, i) * (i + 1);
-    portEXIT_CRITICAL(&buffer_muxes[sensor_idx]);
     return (int16_t)(sum / (length * (length + 1) / 2));
 }
 
@@ -130,21 +133,10 @@ static bool on_adc_continuous_data_ready(adc_continuous_handle_t handle, const a
     }
 
     for (size_t sensor_idx = 0; sensor_idx < SENSOR_COUNT; sensor_idx++)
-    {
         if (num_samples_per_sensor[sensor_idx] != 0)
             buffer_put(sensor_idx, totals[sensor_idx] / num_samples_per_sensor[sensor_idx]);
-    }
 
-    // Must be in DRAM!!!
-    uint16_t value = buffer_get(0, 0);
-    ESP_DRAM_LOGI(
-        TAG,
-        "on_adc_continuous_data_ready: %lu | AVG %d | RAW %d | START %d | END %d | SAMPLES %d | TOTALS %d | VALUE %d",
-        pdTICKS_TO_MS(xTaskGetTickCountFromISR()), sensor_get_value(SENSOR_EC_ADC_CHANNEL),
-        totals[0] / num_samples_per_sensor[0], buffer_start_indexes[0], buffer_end_indexes[0],
-        num_samples_per_sensor[0], totals[0], value);
-
-    return true;
+    return false;
 }
 
 void sensors_init()
